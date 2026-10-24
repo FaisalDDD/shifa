@@ -1,0 +1,62 @@
+{
+  "name": "shifa-pro",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shifa Pro — offline-first pharmacy management (POS + stock) desktop client for the Shifa platform",
+  "main": "dist-electron/electron/main.js",
+  "scripts": {
+    "build:main": "tsc -p tsconfig.node.json",
+    "build:renderer": "vite build",
+    "build": "npm run build:main && npm run build:renderer",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run",
+    "test:smoke": "vitest run tests/smoke",
+    "start": "electron .",
+    "dist": "npm run build && electron-builder --win"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "sql.js": "^1.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/sql.js": "^1.4.9",
+    "@vitejs/plugin-react": "^5.1.1",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.15.3",
+    "pdf-parse": "^1.1.1",
+    "png-to-ico": "^3.0.2",
+    "sharp": "^0.35.5",
+    "typescript": "^5",
+    "vite": "^7.2.4",
+    "vitest": "^3.2.4"
+  },
+  "build": {
+    "appId": "com.shifa.pro",
+    "productName": "Shifa Pro",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}

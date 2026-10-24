@@ -1,0 +1,343 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --font-inter: "Inter", "Segoe UI";
+  --font-cairo: "Cairo", "Noto Sans Arabic", Tahoma;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter), var(--font-cairo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/*
+ * Brand palette — Shifa (Sudan) logo.
+ * Primary navy #002a68, accent sky #aee3fd, on white.
+ * The app's "teal" scale is remapped to this navy/sky scale so the whole
+ * interface re-themes from a single place.
+ */
+@theme {
+  --color-teal-50: #edf6fd;
+  --color-teal-100: #d7ecfb;
+  --color-teal-200: #aee3fd;
+  --color-teal-300: #7cb9f0;
+  --color-teal-400: #3f8bd8;
+  --color-teal-500: #0d4f9e;
+  --color-teal-600: #002a68;
+  --color-teal-700: #00204f;
+  --color-teal-800: #001738;
+  --color-teal-900: #000f25;
+  --color-teal-950: #000a1a;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), var(--font-cairo), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Arabic uses Cairo; Latin uses Inter. */
+:lang(ar) body,
+html[dir="rtl"] body {
+  font-family: var(--font-cairo), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Consistent focus ring for accessibility. */
+*:focus-visible {
+  outline: 2px solid #002a68;
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(0, 42, 104, 0.16);
+}
+
+/* ---------- Landing animations ---------- */
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 32s linear infinite;
+}
+
+[dir="rtl"] .animate-marquee {
+  animation-direction: reverse;
+}
+
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-16px);
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-float {
+  animation: float-y 6s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 24s linear infinite;
+}
+
+.text-gradient {
+  background: linear-gradient(100deg, #002a68 0%, #0d4f9e 45%, #3f8bd8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Subtle scrollbar (WebKit). */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  background-clip: content-box;
+}
+
+/* ---------- Download section: 3D phones ---------- */
+
+.phones-scene {
+  perspective: 1400px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 48px;
+  margin-top: 64px;
+}
+
+.phone-frame {
+  position: relative;
+  width: 220px;
+  height: 448px;
+  border-radius: 36px;
+  padding: 12px;
+  box-shadow: 0 48px 90px -24px rgba(2, 20, 50, 0.5);
+  will-change: transform;
+}
+
+.phone-android {
+  background: #0f172a;
+  animation: float-android 6s ease-in-out infinite;
+}
+
+.phone-ios {
+  background: #1e293b;
+  animation: float-ios 6s ease-in-out infinite;
+  animation-delay: 0.6s;
+}
+
+.phone-camera {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #334155;
+  z-index: 2;
+}
+
+.phone-notch {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 92px;
+  height: 24px;
+  border-radius: 999px;
+  background: #0f172a;
+  z-index: 2;
+}
+
+.phone-screen {
+  width: 100%;
+  height: 100%;
+  border-radius: 25px;
+  background: #ffffff;
+  overflow: hidden;
+  padding: 30px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.phone-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.phone-status-icons {
+  letter-spacing: 2px;
+}
+
+.phone-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.phone-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: #002a68;
+  color: #aee3fd;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.phone-brand {
+  font-weight: 700;
+  color: #002a68;
+  font-size: 15px;
+}
+
+.phone-search {
+  border: 1px solid #e3e9f2;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.phone-card {
+  border: 1px solid #e3e9f2;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 6px 16px -8px rgba(2, 20, 50, 0.12);
+}
+
+.phone-card-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.phone-card-stock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0d4f9e;
+  margin-top: 6px;
+}
+
+.phone-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #12b76a;
+}
+
+.phone-card-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.phone-btn-primary {
+  background: #0d9488;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 8px;
+}
+
+.phone-btn-ghost {
+  border: 1px solid #e3e9f2;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 8px;
+}
+
+@keyframes float-android {
+  0%,
+  100% {
+    transform: rotateY(16deg) rotateX(4deg) translateY(0);
+  }
+  50% {
+    transform: rotateY(16deg) rotateX(4deg) translateY(-14px);
+  }
+}
+
+@keyframes float-ios {
+  0%,
+  100% {
+    transform: rotateY(-16deg) rotateX(4deg) translateY(0);
+  }
+  50% {
+    transform: rotateY(-16deg) rotateX(4deg) translateY(-14px);
+  }
+}
+
+@media (max-width: 640px) {
+  .phones-scene {
+    gap: 20px;
+  }
+  .phone-frame {
+    width: 150px;
+    height: 310px;
+    border-radius: 26px;
+    padding: 8px;
+  }
+  .phone-screen {
+    border-radius: 18px;
+    padding: 24px 10px 10px;
+  }
+  .phone-notch {
+    width: 60px;
+    height: 16px;
+    top: 15px;
+  }
+}
