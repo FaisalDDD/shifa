@@ -91,6 +91,29 @@ const PHONE_CSS = `
 }
 `;
 
+const PRO_CSS = `
+@keyframes pro-s1 {
+  0% { opacity: 0; transform: translateY(14px) scale(0.985); }
+  5% { opacity: 1; transform: translateY(0) scale(1); }
+  45% { opacity: 1; transform: translateY(0) scale(1); }
+  52% { opacity: 0; transform: translateY(-12px) scale(0.99); }
+  100% { opacity: 0; transform: translateY(-12px) scale(0.99); }
+}
+@keyframes pro-s2 {
+  0%, 50% { opacity: 0; transform: translateY(14px) scale(0.985); }
+  55% { opacity: 1; transform: translateY(0) scale(1); }
+  92% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-12px) scale(0.99); }
+}
+.pro-s1 { animation: pro-s1 12s linear infinite; }
+.pro-s2 { animation: pro-s2 12s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .pro-s1, .pro-s2 { animation: none !important; }
+  .pro-s2 { opacity: 1; transform: none; }
+  .pro-s1 { opacity: 0; transform: none; }
+}
+`;
+
 const MENU_TILES: { label: string; icon: LucideIcon; tint: string }[] = [
   { label: "بحث", icon: Search, tint: "bg-teal-50 text-teal-600" },
   { label: "الخريطة", icon: MapPin, tint: "bg-teal-100 text-teal-700" },
@@ -110,7 +133,7 @@ function StatusBar() {
   );
 }
 
-function AppHeader() {
+function AppHeader({ pro = false }: { pro?: boolean }) {
   return (
     <div className="flex items-center gap-1.5">
       <Image
@@ -120,7 +143,7 @@ function AppHeader() {
         height={22}
         className="h-[22px] w-[22px] rounded-md object-contain ring-1 ring-slate-900/10"
       />
-      <span className="text-[13px] font-bold text-teal-600">Shifa</span>
+      <span className="text-[13px] font-bold text-teal-600">Shifa{pro ? " Pro" : ""}</span>
       <span className="ms-auto text-slate-300">
         <Bell className="h-3.5 w-3.5" />
       </span>
@@ -281,6 +304,92 @@ function PhoneMockup() {
 }
 
 /** A single vertical download card (logo -> name -> note -> button). */
+function StatCard({ label, value, tone }: { label: string; value: string; tone: string }) {
+  return (
+    <div className={`rounded-xl p-2.5 ${tone}`}>
+      <p className="text-[9px] font-medium opacity-80">{label}</p>
+      <p className="mt-0.5 text-[13px] font-bold" dir="ltr">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function EmployeeRow({ name, shift, role }: { name: string; shift: string; role: string }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-slate-100 bg-white p-2.5">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-teal-100 text-[11px] font-bold text-teal-700">
+        {name.trim().slice(0, 1)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-bold text-slate-900">{name}</p>
+        <p className="text-[9px] text-slate-500">{role}</p>
+      </div>
+      <span dir="ltr" className="text-[10px] font-semibold text-teal-600">
+        {shift}
+      </span>
+    </div>
+  );
+}
+
+/** Samsung-style handset looping the Pro app flow: finance -> staff planning. */
+function ProPhoneMockup() {
+  return (
+    <div className="relative mx-auto" aria-hidden="true">
+      <style>{PRO_CSS}</style>
+      <div
+        className="absolute -inset-10 rounded-[3rem] bg-gradient-to-b from-teal-200/60 via-teal-100/40 to-transparent blur-2xl"
+        aria-hidden
+      />
+      <div className="relative rounded-[2.75rem] bg-slate-900 p-[10px] shadow-[0_48px_90px_-28px_rgba(2,20,50,0.55)] ring-1 ring-white/10">
+        <div className="absolute -right-[2px] top-24 h-12 w-[3px] rounded-r-full bg-slate-700" />
+        <div className="absolute -left-[2px] top-16 h-16 w-[3px] rounded-l-full bg-slate-700" />
+
+        <div className="relative h-[430px] w-[206px] overflow-hidden rounded-[2.25rem] bg-white sm:h-[480px] sm:w-[230px]">
+          <div className="absolute left-1/2 top-2 z-20 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-black" />
+
+          {/* 1 - financial dashboard */}
+          <div className="shifa-screen pro-s1 flex flex-col gap-2.5 px-3.5 pb-3 pt-3">
+            <StatusBar />
+            <AppHeader pro />
+            <p className="text-[12px] font-bold text-slate-800">المالية</p>
+            <p className="-mt-1.5 text-[10px] text-slate-500">نظرة اليوم</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              <StatCard label="الإيرادات" value="124,500" tone="bg-teal-600 text-white" />
+              <StatCard label="المصروفات" value="38,200" tone="bg-slate-100 text-slate-700" />
+              <StatCard label="الربح" value="86,300" tone="bg-teal-50 text-teal-700" />
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-white p-3">
+              <p className="text-[10px] font-semibold text-slate-500">مبيعات الأسبوع</p>
+              <div className="mt-2 flex h-20 items-end gap-1.5">
+                {[40, 65, 50, 80, 55, 90, 70].map((h, i) => (
+                  <div key={i} className="flex-1 rounded-t bg-teal-500/70" style={{ height: `${h}%` }} />
+                ))}
+              </div>
+              <p className="mt-1.5 text-[9px] text-slate-400">السبت · الأحد · الاثنين · الثلاثاء · الأربعاء · الخميس · الجمعة</p>
+            </div>
+          </div>
+
+          {/* 2 - employee planning */}
+          <div className="shifa-screen pro-s2 flex flex-col gap-2.5 px-3.5 pb-3 pt-3">
+            <StatusBar />
+            <AppHeader pro />
+            <p className="text-[12px] font-bold text-slate-800">الموظفون</p>
+            <p className="-mt-1.5 text-[10px] text-slate-500">ورديات اليوم</p>
+            <EmployeeRow name="محمد علي" shift="8:00 – 16:00" role="صيدلي" />
+            <EmployeeRow name="أحمد حسن" shift="16:00 – 24:00" role="صيدلي" />
+            <EmployeeRow name="سارة إبراهيم" shift="8:00 – 16:00" role="محاسبة" />
+            <div className="mt-1 rounded-xl border border-dashed border-teal-200 bg-teal-50/50 p-2.5 text-center text-[10px] font-medium text-teal-700">
+              + إضافة وردية
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A single vertical download card (logo -> name -> note -> button). */
 function AppBar({
   href,
   name,
@@ -395,7 +504,7 @@ export function DownloadSection() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.7, delay: 0.2, ease: EASE }}
-            className="flex flex-col"
+            className="flex flex-col gap-6 md:gap-8"
           >
             <AppBar
               href="/shifa-pro.apk"
@@ -404,6 +513,7 @@ export function DownloadSection() {
               cta={t("landing.download.pro.cta")}
               variant="navy"
             />
+            <ProPhoneMockup />
           </motion.div>
         </div>
       </div>
