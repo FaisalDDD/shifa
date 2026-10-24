@@ -26,6 +26,9 @@ contextBridge.exposeInMainWorld("api", {
   catalog: {
     list: (query?: string) => ipcRenderer.invoke("catalog:list", query ?? ""),
   },
+  aliases: {
+    add: (productId: string, alias: string) => ipcRenderer.invoke("aliases:add", productId, alias),
+  },
   stock: {
     receive: (batch: {
       id?: string;

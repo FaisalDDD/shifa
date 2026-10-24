@@ -60,6 +60,34 @@ export async function pullProducts(db: Database): Promise<number> {
   return rows.length;
 }
 
+/** Pull this pharmacy's + global product aliases into the local DB. */
+export async function pullAliases(db: Database, token: string, pharmacyId: string): Promise<number> {
+  const [global, own] = await Promise.all([
+    postgrest<{ id: string; product_id: string; alias: string }[]>(
+      `product_aliases?pharmacy_id=is.null&select=id,product_id,alias`, { token }),
+    postgrest<{ id: string; product_id: string; alias: string }[]>(
+      `product_aliases?pharmacy_id=eq.${pharmacyId}&select=id,product_id,alias`, { token }),
+  ]);
+  run(db, "DELETE FROM product_aliases");
+  for (const a of [...global, ...own]) {
+    run(db, "INSERT INTO product_aliases (id, product_id, alias) VALUES (?, ?, ?)", [a.id, a.product_id, a.alias]);
+  }
+  return global.length + own.length;
+}
+
+/** Add a local alias for a product (this pharmacy's own keyword) and sync it up. */
+export async function addAlias(db: Database, token: string, pharmacyId: string, productId: string, alias: string): Promise<{ id: string; alias: string }> {
+  const trimmed = alias.trim();
+  if (!trimmed) throw new Error("Enter an alias.");
+  const rows = await postgrest<{ id: string; alias: string }[]>(
+    `product_aliases`,
+    { token, method: "POST", body: { product_id: productId, pharmacy_id: pharmacyId, alias: trimmed, lang: "ar" } },
+  );
+  const saved = rows?.[0];
+  run(db, "INSERT INTO product_aliases (id, product_id, alias) VALUES (?, ?, ?)", [saved?.id ?? randomUUID(), productId, trimmed]);
+  return { id: saved?.id ?? "", alias: trimmed };
+}
+
 /** Pull the shared pharmacy's append-only finance ledger and daily report rates. */
 export async function pullFinancialData(db: Database, token: string, pharmacyId: string): Promise<number> {
   const [events, rates, rateEvents, periods] = await Promise.all([
@@ -77,9 +105,9 @@ export async function pullFinancialData(db: Database, token: string, pharmacyId:
   return events.length + pullDailyRates(db, rates) + pullRateAudit(db, rateEvents) + pullFinancialPeriods(db, normalizedPeriods);
 }
 
-/** List catalog joined with local stock, optionally filtered by name. */
+/** List catalog joined with local stock, filtered by name/brand/strength/form/barcode. */
 export function listProducts(db: Database, query = ""): CatalogEntry[] {
-  const like = `%${query}%`;
+  const like = `%${query.trim()}%`;
   return all<CatalogEntry>(
     db,
     `SELECT p.id, p.canonical_name, p.brand_name, p.strength, p.dosage_form,
@@ -91,11 +119,13 @@ export function listProducts(db: Database, query = ""): CatalogEntry[] {
             COALESCE(p.low_stock_threshold, 5) AS low_stock_threshold
      FROM products p
      LEFT JOIN batches b ON b.product_id = p.id
-     WHERE p.canonical_name LIKE ? OR p.brand_name LIKE ?
+     WHERE p.canonical_name LIKE ? OR p.brand_name LIKE ? OR p.strength LIKE ?
+        OR p.dosage_form LIKE ? OR p.barcode LIKE ?
+        OR p.id IN (SELECT product_id FROM product_aliases WHERE alias LIKE ?)
      GROUP BY p.id
      ORDER BY p.canonical_name
      LIMIT 200`,
-    [like, like],
+    [like, like, like, like, like, like],
   );
 }
 

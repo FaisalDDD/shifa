@@ -48,6 +48,15 @@ CREATE TABLE IF NOT EXISTS batches (
 CREATE INDEX IF NOT EXISTS idx_batches_product_expiry
   ON batches (product_id, expiry_date);
 
+CREATE TABLE IF NOT EXISTS product_aliases (
+  id TEXT PRIMARY KEY,
+  product_id TEXT NOT NULL,
+  alias TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_product_aliases_product
+  ON product_aliases (product_id);
+
 CREATE TABLE IF NOT EXISTS sales (
   id TEXT PRIMARY KEY,
   sale_no TEXT NOT NULL UNIQUE,

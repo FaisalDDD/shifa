@@ -98,6 +98,9 @@ export interface ShifaProApi {
   catalog: {
     list(query?: string): Promise<CatalogEntry[]>;
   };
+  aliases: {
+    add(productId: string, alias: string): Promise<void>;
+  };
   stock: {
     receive(batch: StockReceiveInput): Promise<void>;
     remove(productId: string): Promise<number>;

@@ -1,8 +1,20 @@
 import type { Product } from "@/types";
 
-/** Lowercase, trim and collapse runs of whitespace for matching. */
+/** Fold Arabic spelling variants + strip diacritics, mirroring the SQL
+ * normalize_arabic() so the app-layer ranker and the DB ranker agree. */
+export function normalizeArabic(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[\u064B-\u0652\u0670\u0640]/g, "") // tashkeel + tatweel
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/[ىئ]/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/ؤ/g, "و");
+}
+
+/** Lowercase, fold Arabic variants, trim and collapse runs of whitespace. */
 export function normalizeQuery(q: string): string {
-  return q.toLowerCase().replace(/\s+/g, " ").trim();
+  return normalizeArabic(q).replace(/\s+/g, " ").trim();
 }
 
 export interface ProductFilters {

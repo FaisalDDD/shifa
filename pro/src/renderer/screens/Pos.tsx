@@ -98,6 +98,7 @@ export function Pos({
   const [recvSalePrice, setRecvSalePrice] = useState("");
   const [recvStripsPerBox, setRecvStripsPerBox] = useState("");
   const [recvPillsPerStrip, setRecvPillsPerStrip] = useState("");
+  const [aliasInput, setAliasInput] = useState("");
   const [priceEdit, setPriceEdit] = useState("");
   const [thresholdEdit, setThresholdEdit] = useState("5");
   const [recvPayStatus, setRecvPayStatus] = useState<PayStatus>("unpaid");
@@ -326,6 +327,21 @@ export function Pos({
       setRecvAmountPaid("");
       setNotice(t("ok.stockAdded"));
       await refresh();
+    } catch (err) {
+      setNotice(friendly(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveAlias() {
+    if (!stockProductId || !aliasInput.trim()) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      await window.api.aliases.add(stockProductId, aliasInput);
+      setAliasInput("");
+      setNotice(t("ok.aliasAdded"));
     } catch (err) {
       setNotice(friendly(err));
     } finally {
@@ -880,6 +896,16 @@ export function Pos({
                     }}
                   >
                     ✕
+                  </button>
+                </div>
+                <div className="price-row">
+                  <input
+                    placeholder={t("stock.aliasPlaceholder")}
+                    value={aliasInput}
+                    onChange={(e) => setAliasInput(e.target.value)}
+                  />
+                  <button className="secondary" onClick={saveAlias} disabled={busy || !aliasInput.trim()}>
+                    {t("stock.addAlias")}
                   </button>
                 </div>
                 {isAdmin && (

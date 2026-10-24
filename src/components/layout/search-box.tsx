@@ -9,6 +9,7 @@ import { useLanguage } from "@/lib/i18n";
 interface Hit {
   id: string;
   name: string;
+  count: number;
 }
 
 export function SearchBox() {
@@ -36,13 +37,32 @@ export function SearchBox() {
           search_term: term,
           result_limit: 8,
         });
+        const hits = (data ?? []) as {
+          id: string;
+          canonical_name: string;
+          strength: string | null;
+        }[];
+        const ids = hits.map((p) => p.id);
+        const counts = new Map<string, number>();
+        if (ids.length) {
+          const { data: inv } = await supabase
+            .from("pharmacy_inventory_public")
+            .select("product_id, pharmacy_id")
+            .in("product_id", ids)
+            .in("availability_status", ["AVAILABLE", "LOW_STOCK"]);
+          const seen = new Map<string, Set<string>>();
+          for (const r of (inv ?? []) as { product_id: string; pharmacy_id: string }[]) {
+            if (!seen.has(r.product_id)) seen.set(r.product_id, new Set());
+            seen.get(r.product_id)!.add(r.pharmacy_id);
+          }
+          for (const [pid, s] of seen) counts.set(pid, s.size);
+        }
         setResults(
-          (data ?? []).map(
-            (p: { id: string; canonical_name: string; strength: string | null }) => ({
-              id: p.id,
-              name: p.strength ? `${p.canonical_name} ${p.strength}` : p.canonical_name,
-            }),
-          ),
+          hits.map((p) => ({
+            id: p.id,
+            name: p.strength ? `${p.canonical_name} ${p.strength}` : p.canonical_name,
+            count: counts.get(p.id) ?? 0,
+          })),
         );
         setOpen(true);
       } catch {
@@ -97,9 +117,14 @@ export function SearchBox() {
                   setQ("");
                   router.push(`/products/${r.id}`);
                 }}
-                className="block w-full px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-teal-50"
+                className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-teal-50"
               >
-                {r.name}
+                <span className="truncate">{r.name}</span>
+                {r.count > 0 ? (
+                  <span className="shrink-0 text-xs text-slate-400">
+                    {r.count === 1 ? t("search.pharmacyCountOne") : t("search.pharmacyCount", { count: r.count })}
+                  </span>
+                ) : null}
               </button>
             ))
           )}

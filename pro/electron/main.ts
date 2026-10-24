@@ -11,6 +11,8 @@ import { databasePath, importLegacyDatabase, legacyImportAvailable } from "../sr
 import { recordSale, receiveBatch, getStockLevels, removeStock } from "../src/main/stock";
 import {
   pullProducts,
+  pullAliases,
+  addAlias,
   pullFinancialData,
   listProducts,
   setProductPrice,
@@ -374,10 +376,19 @@ function registerIpc(): void {
     const branch = pharmacyId!;
     const d = await db();
     const count = await pullProducts(d.db);
+    const aliasCount = await pullAliases(d.db, active.access_token, branch);
     const financialCount = active.role === "admin" || active.membership_role === "owner"
       ? await pullFinancialData(d.db, active.access_token, branch) : 0;
     persist(d);
-    return { count, financialCount };
+    return { count, aliasCount, financialCount };
+  }));
+
+  ipcMain.handle("aliases:add", (_e, productId: string, alias: string) => cloudOperation(async () => {
+    requirePharmacyOperator();
+    const active = session!;
+    const d = await db();
+    await addAlias(d.db, active.access_token, pharmacyId!, productId, alias);
+    persist(d);
   }));
 
   ipcMain.handle("sync:push", () => cloudOperation(async () => {

@@ -221,6 +221,8 @@ const messages = {
     "search.clearLocation": "Clear location",
     "search.setLocation": "Set location",
     "search.searching": "Searching…",
+    "search.pharmacyCount": "{count} pharmacies",
+    "search.pharmacyCountOne": "1 pharmacy",
     "search.failed": "Search failed",
     "search.couldNotReach":
       "Could not reach the server. Check your connection and try again.",
@@ -484,6 +486,7 @@ const messages = {
     "landing.download.ios": "iOS — coming soon",
     "landing.download.pro.cta": "Download Shifa Pro",
     "landing.download.pro.note": "APK · Android · pharmacy admins",
+    "landing.download.pro.for": "For pharmacies",
     "landing.download.pro.desc": "Financial, employees and stock dashboards — for pharmacy admins only.",
   },
   ar: {
@@ -682,6 +685,8 @@ const messages = {
     "search.clearLocation": "مسح الموقع",
     "search.setLocation": "تحديد الموقع",
     "search.searching": "جارٍ البحث…",
+    "search.pharmacyCount": "{count} صيدليات",
+    "search.pharmacyCountOne": "صيدلية واحدة",
     "search.failed": "فشل البحث",
     "search.couldNotReach": "تعذر الوصول إلى الخادم. تحقق من اتصالك وحاول مرة أخرى.",
     "search.empty.title": "ابحث عن دواء",
@@ -915,6 +920,7 @@ const messages = {
     "landing.download.ios": "iOS — قريباً",
     "landing.download.pro.cta": "حمّل شفاء برو",
     "landing.download.pro.note": "APK · أندرويد · مديرو الصيدليات",
+    "landing.download.pro.for": "للصيدليات",
     "landing.download.pro.desc": "لوحات المالية والموظفين والمخزون — لمديري الصيدليات فقط.",
   },
 } as const;
