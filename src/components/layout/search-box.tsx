@@ -37,10 +37,12 @@ export function SearchBox() {
           result_limit: 8,
         });
         setResults(
-          (data ?? []).map((p: { id: string; canonical_name: string }) => ({
-            id: p.id,
-            name: p.canonical_name,
-          })),
+          (data ?? []).map(
+            (p: { id: string; canonical_name: string; strength: string | null }) => ({
+              id: p.id,
+              name: p.strength ? `${p.canonical_name} ${p.strength}` : p.canonical_name,
+            }),
+          ),
         );
         setOpen(true);
       } catch {

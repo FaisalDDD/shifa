@@ -6,6 +6,7 @@ export interface ProRelease {
   filename: string;
   version: string;
   sizeBytes: number;
+  downloadUrl: string;
 }
 
 // No request parameter or environment variable can choose a filesystem path.
@@ -14,6 +15,15 @@ export function proReleaseDirectory() {
 }
 
 export async function getProRelease(): Promise<ProRelease | null> {
+  // Hosted release (GitHub Releases / CDN) — the source of truth on Vercel,
+  // where the local pro/release directory is not deployed.
+  const hostedUrl = process.env.SHIFA_PRO_DOWNLOAD_URL;
+  if (hostedUrl) {
+    const filename = hostedUrl.split("/").pop() ?? "Shifa Pro Setup.exe";
+    const version = (hostedUrl.match(/(\d+\.\d+\.\d+)/) ?? [])[1] ?? "latest";
+    return { filename, version, sizeBytes: 0, downloadUrl: hostedUrl };
+  }
+
   try {
     const directory = proReleaseDirectory();
     const canonicalDirectory = await realpath(directory);
@@ -26,7 +36,7 @@ export async function getProRelease(): Promise<ProRelease | null> {
       const info = await lstat(filePath);
       if (!info.isFile() || info.isSymbolicLink() || info.size === 0) continue;
       if (path.dirname(await realpath(filePath)) !== canonicalDirectory) continue;
-      return { ...candidate, sizeBytes: info.size };
+      return { ...candidate, sizeBytes: info.size, downloadUrl: "/api/downloads/pro" };
     }
     return null;
   } catch {

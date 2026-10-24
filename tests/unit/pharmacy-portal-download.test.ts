@@ -36,7 +36,7 @@ describe("fixed-path Pro installer download", () => {
   it("streams the real installer bytes with attachment headers, ignoring client paths", async () => {
     await installer("Shifa Pro Setup 0.1.0.exe");
     const metadata = await getProRelease();
-    expect(metadata).toEqual({ filename: "Shifa Pro Setup 0.1.0.exe", version: "0.1.0", sizeBytes: Buffer.byteLength("MZ-test-installer") });
+    expect(metadata).toEqual({ filename: "Shifa Pro Setup 0.1.0.exe", version: "0.1.0", sizeBytes: Buffer.byteLength("MZ-test-installer"), downloadUrl: "/api/downloads/pro" });
     const response = await GET();
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Disposition")).toContain('attachment; filename="Shifa Pro Setup 0.1.0.exe"');

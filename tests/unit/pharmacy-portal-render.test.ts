@@ -12,7 +12,7 @@ const pharmacy: Pharmacy = {
   phone: "+9647700000000", website: null, verification_status: "pending", is_active: true, is_available: true, is_demo: false,
   opening_hours: null, services: null, created_at: "2026-10-01T00:00:00Z", updated_at: "2026-10-01T00:00:00Z",
 };
-const release = { filename: "Shifa Pro Setup 0.1.0.exe", version: "0.1.0", sizeBytes: 1024 };
+const release = { filename: "Shifa Pro Setup 0.1.0.exe", version: "0.1.0", sizeBytes: 1024, downloadUrl: "/api/downloads/pro" };
 beforeEach(() => { language.lang = "en"; });
 
 describe("lightweight pharmacy portal", () => {
