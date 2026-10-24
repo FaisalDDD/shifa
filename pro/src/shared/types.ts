@@ -57,6 +57,26 @@ export interface AuthSession {
   email: string | null;
   role: string;
   membership_role?: "owner" | "staff" | null;
+  branch_id?: string | null;
+  business_id?: string | null;
+  branch_name?: string | null;
+}
+
+export interface BranchOption {
+  id: string;
+  business_id: string;
+  name: string;
+  branch_name?: string | null;
+  branch_code?: string | null;
+  membership_role: "owner" | "staff";
+  verification_status?: string | null;
+  is_active?: boolean;
+}
+
+export interface AuthSignInResult {
+  session: AuthSession | null;
+  pharmacyId: string | null;
+  branches: BranchOption[];
 }
 
 export interface PharmacyEmployee {
@@ -122,6 +142,7 @@ export interface CatalogEntry {
   prescription_classification: PrescriptionClassification;
   stock: number;
   price: number | null;
+  low_stock_threshold: number;
 }
 
 export interface ExpiryItem {

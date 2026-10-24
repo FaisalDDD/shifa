@@ -57,7 +57,7 @@ export async function nearbyPharmacies(
   if (options.productId) {
     const ids = pharmacies.map((p) => p.id);
     const { data: inv } = await supabase
-      .from("pharmacy_inventory")
+      .from("pharmacy_inventory_public")
       .select("*")
       .eq("product_id", options.productId)
       .in("pharmacy_id", ids);

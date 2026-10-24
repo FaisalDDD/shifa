@@ -80,35 +80,6 @@ data class ProductRef(
 )
 
 // ---------------------------------------------------------------------------
-// Inventory
-// ---------------------------------------------------------------------------
-
-data class InventoryItem(
-    val id: String,
-    @SerializedName("product_id") val productId: String? = null,
-    @SerializedName("availability_status") val availabilityStatus: String? = null,
-    val quantity: Int? = null,
-    val price: Double? = null,
-    val currency: String? = null,
-    @SerializedName("last_verified_at") val lastVerifiedAt: String? = null,
-    val products: ProductRef? = null,
-    val pharmacies: Pharmacy? = null,
-)
-
-data class UpsertInventoryRequest(
-    @SerializedName("pharmacy_id") val pharmacyId: String,
-    @SerializedName("product_id") val productId: String,
-    @SerializedName("availability_status") val availabilityStatus: String = "AVAILABLE",
-    val quantity: Int? = null,
-    val price: Double? = null,
-    val currency: String? = null,
-)
-
-data class UpdateInventoryRequest(
-    @SerializedName("availability_status") val availabilityStatus: String,
-)
-
-// ---------------------------------------------------------------------------
 // Memberships
 // ---------------------------------------------------------------------------
 

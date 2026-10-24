@@ -492,6 +492,8 @@ export function financialReport(db: Database, start: string, end: string): Finan
     WHERE s.business_date >= ? AND s.business_date <= ? AND si.accounting_cost_minor IS NULL`, [start, end])?.units ?? 0;
   const incompleteCostSales = get<{ n: number }>(db, `SELECT COUNT(*) AS n FROM financial_journals
     WHERE entry_type='sale' AND is_complete=0 AND business_date >= ? AND business_date <= ?`, [start, end])?.n ?? 0;
+  const incompleteCostEvents = get<{ n: number }>(db, `SELECT COUNT(*) AS n FROM financial_journals
+    WHERE is_complete=0 AND business_date >= ? AND business_date <= ?`, [start, end])?.n ?? 0;
   const allSales = get<{ n: number }>(db, `SELECT COUNT(*) AS n FROM financial_journals
     WHERE entry_type='sale' AND business_date >= ? AND business_date <= ?`, [start, end])?.n ?? 0;
   const costingMethods = new Set(all<{ costing_method: string | null }>(db,
@@ -517,7 +519,7 @@ export function financialReport(db: Database, start: string, end: string): Finan
   const grossMinor = revenueMinor - cogsMinor;
   const netMinor = grossMinor - expensesMinor - writeoffMinor;
   const usdMetric = (field: "revenue_minor" | "cogs_minor" | "expenses_minor" | "writeoff_minor" | "net_minor"): number | null => {
-    if (!ratesComplete || ((field === "cogs_minor" || field === "net_minor") && incompleteCostSales > 0)) return null;
+    if (!ratesComplete || (field === "cogs_minor" && incompleteCostSales > 0) || (field === "net_minor" && incompleteCostEvents > 0)) return null;
     return activeDays.reduce((total, day) => {
       const amount = field === "net_minor" ? day.revenue_minor - day.cogs_minor - day.expenses_minor - day.writeoff_minor : day[field];
       return total + fromMinorUnits(amount) / rates.get(day.business_date)!;
@@ -529,10 +531,10 @@ export function financialReport(db: Database, start: string, end: string): Finan
     currency: "SDG",
     revenue_sdg: fromMinorUnits(revenueMinor),
     cogs_sdg: fromMinorUnits(cogsMinor),
-    gross_profit_sdg: incompleteCostSales > 0 ? null : fromMinorUnits(grossMinor),
+    gross_profit_sdg: incompleteCostEvents > 0 ? null : fromMinorUnits(grossMinor),
     operating_expenses_sdg: fromMinorUnits(expensesMinor),
     inventory_writeoff_sdg: fromMinorUnits(writeoffMinor),
-    net_profit_sdg: incompleteCostSales > 0 ? null : fromMinorUnits(netMinor),
+    net_profit_sdg: incompleteCostEvents > 0 ? null : fromMinorUnits(netMinor),
     cashflow_sdg: fromMinorUnits(cashflowMinor),
     sales_collected_sdg: fromMinorUnits(salesCollectedMinor),
     expenses_paid_sdg: fromMinorUnits(expensesPaidMinor),
@@ -561,7 +563,7 @@ export function financialReport(db: Database, start: string, end: string): Finan
 
 export function closeFinancialPeriod(db: Database, start: string, end: string, actorId: string | null): FinancialPeriodClose {
   const report = financialReport(db, start, end);
-  if (report.incomplete_cost_sales > 0) throw new Error("This period cannot close while sales have missing cost history.");
+  if (report.net_profit_sdg === null) throw new Error("This period cannot close while sales or stock writeoffs have missing cost history.");
   if (report.close && !report.close.reopened_at) throw new Error("This financial period is already closed.");
   const existing = report.close;
   const id = existing?.id ?? randomUUID();

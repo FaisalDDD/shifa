@@ -6,7 +6,8 @@
 import { describe, expect, it } from "vitest";
 import { insertProduct, postgrest, signUp } from "../../src/main/supabase";
 
-describe("smoke: product submission (pending -> hidden until verified)", () => {
+// This creates real backend rows. Run only against an explicitly chosen test backend.
+describe.skipIf(process.env.SHIFA_LIVE_SMOKE !== "1")("smoke: product submission (pending -> hidden until verified)", () => {
   it("saves a pending product and hides it from the public catalog", async () => {
     const email = `pro-test-${Date.now()}@example.com`;
     const session = await signUp(email, "test-password-123");

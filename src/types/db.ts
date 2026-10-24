@@ -8,7 +8,7 @@ export type VerificationStatus =
   | "rejected"
   | "suspended";
 export type MembershipRole = "owner" | "staff";
-export type AvailabilityStatus = "AVAILABLE" | "OUT_OF_STOCK" | "UNKNOWN";
+export type AvailabilityStatus = "AVAILABLE" | "LOW_STOCK" | "OUT_OF_STOCK" | "UNKNOWN";
 export type StockSource =
   | "PHARMACY_MANUAL"
   | "VERIFIED_INVENTORY_INTEGRATION"
@@ -53,6 +53,10 @@ export interface Pharmacy {
   is_active: boolean;
   is_available: boolean;
   is_demo: boolean;
+  business_id?: string;
+  branch_name?: string | null;
+  branch_code?: string | null;
+  is_headquarters?: boolean;
   opening_hours: OpeningHour[] | null;
   services: string[] | null;
   created_at: ISODateString;

@@ -1,9 +1,8 @@
 package com.shifa.app.ui
 
-import androidx.compose.foundation.layout.Arrangement
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,7 +15,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -39,14 +37,14 @@ import com.shifa.app.data.SignUpRequest
 import kotlinx.coroutines.launch
 
 @Composable
-fun AuthScreen(onAuthenticated: (String) -> Unit) {
+fun AuthScreen(onAuthenticated: () -> Unit, onBrowse: () -> Unit) {
     val state = LocalLanguageState.current
     val strings = state.strings
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var mode by remember { mutableStateOf("signin") }
-    var accountType by remember { mutableStateOf("customer") }
+
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -69,23 +67,23 @@ fun AuthScreen(onAuthenticated: (String) -> Unit) {
                     val resp = Client.auth.signIn("password", email.trim(), password)
                     if (!resp.accessToken.isNullOrBlank()) {
                         persistSession(resp.accessToken, resp.refreshToken, resp.user?.id, resp.user?.email)
-                        onAuthenticated(Session.accountType)
+                        onAuthenticated()
                     } else {
                         error = strings.signingInFailed
                     }
                 } else {
-                    Session.accountType = accountType
+
                     val data = if (name.isNotBlank()) mapOf("display_name" to name.trim()) else null
                     val resp = Client.auth.signUp(SignUpRequest(email.trim(), password, data))
                     if (!resp.accessToken.isNullOrBlank()) {
                         persistSession(resp.accessToken, resp.refreshToken, resp.user?.id, resp.user?.email)
-                        onAuthenticated(accountType)
+                        onAuthenticated()
                     } else {
                         error = strings.checkEmail
                     }
                 }
             } catch (e: Exception) {
-                error = e.message ?: strings.somethingWentWrong
+                error = friendlyError(e, strings)
             } finally {
                 loading = false
             }
@@ -113,23 +111,14 @@ fun AuthScreen(onAuthenticated: (String) -> Unit) {
             ShifaLogo(size = 104.dp)
             Spacer(Modifier.height(10.dp))
             Text(
-                if (mode == "signup" && accountType == "pharmacy") strings.registerBusinessTagline else strings.tagline,
+                strings.tagline,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(24.dp))
 
             if (mode == "signup") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("customer" to strings.customer, "pharmacy" to strings.business).forEach { (key, label) ->
-                        FilterChip(
-                            selected = accountType == key,
-                            onClick = { accountType = key },
-                            label = { Text(label) },
-                        )
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
+
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -175,6 +164,9 @@ fun AuthScreen(onAuthenticated: (String) -> Unit) {
             Spacer(Modifier.height(8.dp))
             TextButton(onClick = { mode = if (mode == "signin") "signup" else "signin"; error = null }) {
                 Text(if (mode == "signin") strings.noAccountSignUp else strings.haveAccountSignIn)
+            }
+            TextButton(onClick = onBrowse, enabled = !loading) {
+                Text(strings.continueBrowsing)
             }
           }
           }

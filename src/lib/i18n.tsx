@@ -288,7 +288,11 @@ const messages = {
     // --- stock ---
     "stock.unknown": "Availability unknown",
     "stock.inStock": "In stock",
+    "stock.lowStock": "Low stock",
     "stock.outOfStock": "Out of stock",
+    "stock.low.recent": "Recently confirmed low stock",
+    "stock.low.older": "Pharmacy-reported low stock",
+    "stock.low.stale": "Reported low stock — may have changed",
     "stock.available.recent": "Recently confirmed available",
     "stock.available.older": "Pharmacy-reported available",
     "stock.available.stale": "Reported available — may have changed",
@@ -731,7 +735,11 @@ const messages = {
 
     "stock.unknown": "التوفر غير معروف",
     "stock.inStock": "متوفر",
+    "stock.lowStock": "مخزون منخفض",
     "stock.outOfStock": "غير متوفر",
+    "stock.low.recent": "تم تأكيد انخفاض المخزون مؤخراً",
+    "stock.low.older": "أفادت الصيدلية بانخفاض المخزون",
+    "stock.low.stale": "أُفيد بانخفاض المخزون — قد يكون تغيّر",
     "stock.available.recent": "متوفر ومؤكد حديثًا",
     "stock.available.older": "متوفر حسب إبلاغ الصيدلية",
     "stock.available.stale": "مُبلّغ عنه متوفر — ربما تغيّر",

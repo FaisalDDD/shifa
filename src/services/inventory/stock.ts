@@ -64,6 +64,43 @@ export function buildStockDisplay(
     hasUsableData: true,
   } as const;
 
+  if (availability === "LOW_STOCK") {
+    if (freshness === "recent") {
+      return {
+        ...base,
+        label: "Recently confirmed low stock",
+        hint: age ? `Updated ${age}` : "Recently updated",
+        labelKey: "stock.low.recent",
+        hintKey: age ? "stock.hint.updated" : "stock.hint.recently",
+        hintTimestamp: verifiedIso,
+        callToConfirm: false,
+        icon: "low",
+      };
+    }
+    if (freshness === "older") {
+      return {
+        ...base,
+        label: "Low stock reported by pharmacy",
+        hint: age ? `Last updated ${age}` : null,
+        labelKey: "stock.low.older",
+        hintKey: age ? "stock.hint.lastUpdated" : undefined,
+        hintTimestamp: verifiedIso,
+        callToConfirm: false,
+        icon: "low",
+      };
+    }
+    return {
+      ...base,
+      label: "Low stock reported — call to confirm",
+      hint: age ? `Last verified ${age}` : "Not recently verified",
+      labelKey: "stock.low.stale",
+      hintKey: age ? "stock.hint.lastVerified" : "stock.hint.notVerified",
+      hintTimestamp: verifiedIso,
+      callToConfirm: true,
+      icon: "low",
+    };
+  }
+
   if (availability === "AVAILABLE") {
     if (freshness === "recent") {
       return {
@@ -159,5 +196,6 @@ export function formatRelativeTime(from: Date, now: Date = new Date()): string {
  */
 export function customerStockLabelKey(stock: StockDisplay): string {
   if (!stock.hasUsableData) return "stock.unknown";
+  if (stock.availability === "LOW_STOCK") return "stock.lowStock";
   return stock.availability === "AVAILABLE" ? "stock.inStock" : "stock.outOfStock";
 }

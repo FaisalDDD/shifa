@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("api", {
   auth: {
     signIn: (email: string, password: string) =>
       ipcRenderer.invoke("auth:signIn", email, password),
+    selectBranch: (branchId: string) => ipcRenderer.invoke("auth:selectBranch", branchId),
     signOut: () => ipcRenderer.invoke("auth:signOut"),
   },
   settings: {
@@ -107,6 +108,8 @@ contextBridge.exposeInMainWorld("api", {
     lookupImage: (name: string) => ipcRenderer.invoke("product:lookupImage", name),
     setPrice: (productId: string, price: number) =>
       ipcRenderer.invoke("product:setPrice", productId, price),
+    setThreshold: (productId: string, threshold: number) =>
+      ipcRenderer.invoke("product:setThreshold", productId, threshold),
   },
   insights: {
     expiring: () => ipcRenderer.invoke("insights:expiring"),
@@ -156,6 +159,7 @@ contextBridge.exposeInMainWorld("api", {
   team: {
     list: () => ipcRenderer.invoke("team:list"),
     invite: (email: string) => ipcRenderer.invoke("team:invite", email),
+    provisionAdmin: (input: { email: string; password: string; display_name: string }) => ipcRenderer.invoke("team:provisionAdmin", input),
     remove: (userId: string) => ipcRenderer.invoke("team:remove", userId),
     saveSettings: (input: {
       user_id: string;

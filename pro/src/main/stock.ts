@@ -310,6 +310,8 @@ export function receiveBatch(
   if (!Number.isInteger(input.quantity) || input.quantity <= 0 || !Number.isFinite(input.unit_cost) || input.unit_cost < 0) {
     throw new Error("Enter a positive whole-number quantity and a valid unit cost.");
   }
+  // Normalize once at receipt, before physical, purchasing and FIFO records diverge.
+  input = { ...input, unit_cost: toMinorUnits(input.unit_cost) / 100 };
   const id = randomUUID();
   const eventId = randomUUID();
   const now = new Date();

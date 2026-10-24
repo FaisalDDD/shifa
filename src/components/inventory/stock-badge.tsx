@@ -55,13 +55,14 @@ export function StockBadge({
   }
 
   const isAvailable = stock.availability === "AVAILABLE";
-  const Icon = isAvailable ? CheckCircle2 : XCircle;
+  const isLow = stock.availability === "LOW_STOCK";
+  const Icon = isLow ? AlertTriangle : isAvailable ? CheckCircle2 : XCircle;
 
   return (
     <span
       className={cn(
         "inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm",
-        isAvailable ? "text-teal-700" : "text-rose-700",
+        isAvailable ? "text-teal-700" : isLow ? "text-amber-700" : "text-rose-700",
         className,
       )}
     >
@@ -86,6 +87,8 @@ export function StockDot({ stock }: { stock: StockDisplay }) {
     ? "bg-slate-300"
     : stock.availability === "AVAILABLE"
       ? "bg-teal-500"
-      : "bg-rose-500";
+      : stock.availability === "LOW_STOCK"
+        ? "bg-amber-400"
+        : "bg-rose-500";
   return <span className={cn("inline-block h-2.5 w-2.5 rounded-full", tone)} aria-hidden />;
 }

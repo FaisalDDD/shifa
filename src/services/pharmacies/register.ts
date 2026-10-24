@@ -85,6 +85,58 @@ export async function registerPharmacy(
   return pharmacy;
 }
 
+export interface RegisterBranchInput extends RegisterPharmacyInput {
+  business_id: string;
+  branch_name: string;
+  branch_code: string;
+}
+
+/**
+ * Register a pending branch under an existing business. Postgres RLS checks
+ * business ownership; this function never accepts or forwards a role override.
+ */
+export async function registerBranch(
+  userId: string,
+  input: RegisterBranchInput,
+): Promise<Pharmacy> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("pharmacies")
+    .insert({
+      business_id: input.business_id,
+      branch_name: input.branch_name,
+      branch_code: input.branch_code,
+      is_headquarters: false,
+      name: input.name,
+      slug: slugify(`${input.name}-${input.branch_code}`),
+      description: input.description ?? null,
+      address: input.address,
+      city: input.city ?? null,
+      postal_code: input.postal_code ?? null,
+      country_code: input.country_code ?? null,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      phone: input.phone ?? null,
+      website: input.website || null,
+      verification_status: "pending",
+      is_active: true,
+      is_demo: false,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+
+  const pharmacy = data as Pharmacy;
+  await recordAudit({
+    actorUserId: userId,
+    action: "pharmacy.branch_register",
+    entityType: "pharmacy",
+    entityId: pharmacy.id,
+    metadata: { business_id: input.business_id, branch_code: input.branch_code },
+  });
+  return pharmacy;
+}
+
 /** The pharmacies a user is a member of (for dashboard / supplier scoping). */
 export async function getUserPharmacies(userId: string): Promise<Pharmacy[]> {
   const supabase = await createClient();

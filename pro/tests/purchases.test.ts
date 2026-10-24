@@ -47,6 +47,13 @@ describe("purchases: ledger + payables", () => {
     expect(pay.rows).toHaveLength(2);
   });
 
+  it("rejects an unsafe purchase total before inserting a ledger row", () => {
+    expect(() => recordPurchase(db.db, {
+      product_id: "p2", quantity: 100_000_000_000_000, unit_cost: 1.01,
+    })).toThrow();
+    expect(outstandingPayables(db.db).total_owed).toBe(310);
+  });
+
   it("marks a payable as paid", () => {
     const id = outstandingPayables(db.db).rows.find(
       (r) => r.product_name === "Amoxicillin",

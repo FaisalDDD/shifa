@@ -6,6 +6,7 @@ import initSqlJs from "sql.js";
 import type { Database, SqlJsStatic } from "sql.js";
 import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 
 let SQL: SqlJsStatic | null = null;
 
@@ -27,6 +28,7 @@ CREATE TABLE IF NOT EXISTS products (
   barcode TEXT,
   image_url TEXT,
   price REAL,
+  low_stock_threshold INTEGER NOT NULL DEFAULT 5,
   prescription_classification TEXT NOT NULL DEFAULT 'unknown'
 );
 
@@ -342,6 +344,7 @@ export async function openDb(filePath: string): Promise<LocalDb> {
   };
   alter("ALTER TABLE products ADD COLUMN image_url TEXT");
   alter("ALTER TABLE products ADD COLUMN price REAL");
+  alter("ALTER TABLE products ADD COLUMN low_stock_threshold INTEGER NOT NULL DEFAULT 5");
   alter("ALTER TABLE batches ADD COLUMN mfg_date TEXT");
   alter("ALTER TABLE batches ADD COLUMN sale_price REAL");
   alter("ALTER TABLE sales ADD COLUMN customer_id TEXT");
@@ -415,8 +418,28 @@ export async function openDb(filePath: string): Promise<LocalDb> {
 }
 
 export function persist(db: LocalDb): void {
-  const data = db.db.export();
-  fs.writeFileSync(db.filePath, Buffer.from(data));
+  // Never truncate the only durable copy. Prepare and flush a sibling file,
+  // preserve the last committed snapshot, then atomically replace the target.
+  const data = Buffer.from(db.db.export());
+  const temporary = `${db.filePath}.${randomUUID()}.tmp`;
+  const backupTemporary = `${db.filePath}.bak.${randomUUID()}.tmp`;
+  let descriptor: number | undefined;
+  try {
+    descriptor = fs.openSync(temporary, "wx", 0o600);
+    fs.writeFileSync(descriptor, data);
+    fs.fsyncSync(descriptor);
+    fs.closeSync(descriptor);
+    descriptor = undefined;
+    if (fs.existsSync(db.filePath)) {
+      fs.copyFileSync(db.filePath, backupTemporary, fs.constants.COPYFILE_EXCL);
+      fs.renameSync(backupTemporary, `${db.filePath}.bak`);
+    }
+    fs.renameSync(temporary, db.filePath);
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
+    fs.rmSync(temporary, { force: true });
+    fs.rmSync(backupTemporary, { force: true });
+  }
 }
 
 export function closeDb(db: LocalDb): void {

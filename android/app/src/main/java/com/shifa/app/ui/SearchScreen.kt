@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.shifa.app.data.Client
+import com.shifa.app.data.DiscoveryCache
 import com.shifa.app.data.NearbyPharmaciesBody
 import com.shifa.app.data.Pharmacy
 import com.shifa.app.data.Product
@@ -78,6 +79,8 @@ private fun lastKnownLocation(context: Context): Pair<Double, Double>? {
 fun SearchScreen(
     onProductClick: (Product) -> Unit,
     onPharmacyClick: (Pharmacy) -> Unit,
+    isSignedIn: Boolean,
+    onSignIn: () -> Unit,
     onSignOut: () -> Unit,
 ) {
     val state = LocalLanguageState.current
@@ -91,15 +94,16 @@ fun SearchScreen(
     var pharmacies by remember { mutableStateOf<List<Pharmacy>>(emptyList()) }
     var popular by remember { mutableStateOf<List<Product>>(emptyList()) }
     var top by remember { mutableStateOf<List<Pharmacy>>(emptyList()) }
-    var topTitle by remember { mutableStateOf(strings.topPharmacies) }
+    var showingNearby by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var offlineSnapshot by remember { mutableStateOf(false) }
     var searched by remember { mutableStateOf(false) }
 
     fun loadTopPharmacies() {
         scope.launch {
             val loc = lastKnownLocation(context)
-            topTitle = if (loc != null) strings.nearbyPharmacies else strings.topPharmacies
+            showingNearby = loc != null
             top = try {
                 if (loc != null) {
                     Client.rest.nearbyPharmacies(NearbyPharmaciesBody(searchLat = loc.first, searchLng = loc.second))
@@ -114,11 +118,12 @@ fun SearchScreen(
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        if (granted) loadTopPharmacies()
+    ) {
+        loadTopPharmacies()
     }
 
     LaunchedEffect(Unit) {
+        loadTopPharmacies()
         popular = try {
             Client.rest.suggestedProducts()
         } catch (_: Exception) {
@@ -128,9 +133,7 @@ fun SearchScreen(
             context,
             Manifest.permission.ACCESS_FINE_LOCATION,
         ) == PackageManager.PERMISSION_GRANTED
-        if (granted) {
-            loadTopPharmacies()
-        } else {
+        if (!granted) {
             permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
@@ -149,8 +152,13 @@ fun SearchScreen(
         try {
             products = Client.rest.searchProducts(SearchProductsBody(searchTerm = query.trim(), includeDemo = false))
             pharmacies = Client.rest.searchPharmacies(name = "ilike.*${query.trim()}*")
+            DiscoveryCache.saveSearch(query, products, pharmacies)
+            offlineSnapshot = false
         } catch (e: Exception) {
-            error = e.message ?: strings.somethingWentWrong
+            products = DiscoveryCache.loadProducts(query)
+            pharmacies = DiscoveryCache.loadPharmacies(query)
+            offlineSnapshot = products.isNotEmpty() || pharmacies.isNotEmpty()
+            error = if (offlineSnapshot) null else friendlyError(e, strings)
         } finally {
             loading = false
         }
@@ -161,7 +169,9 @@ fun SearchScreen(
             title = { ShifaLogo(size = 34.dp) },
             actions = {
                 LanguageMenu(state)
-                TextButton(onClick = onSignOut) { Text(strings.signOut) }
+                TextButton(onClick = if (isSignedIn) onSignOut else onSignIn) {
+                    Text(if (isSignedIn) strings.signOut else strings.signIn)
+                }
             },
         )
         OutlinedTextField(
@@ -176,6 +186,14 @@ fun SearchScreen(
                 .onFocusChanged { focused = it.isFocused },
         )
 
+        if (offlineSnapshot) {
+            Text(
+                strings.offlineSnapshot,
+                color = MaterialTheme.colorScheme.tertiary,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
         when {
             query.isNotBlank() -> when {
                 loading -> LoadingState(strings.loading)
@@ -220,7 +238,7 @@ fun SearchScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (top.isNotEmpty()) {
-                    item { SectionHeader(topTitle) }
+                    item { SectionHeader(if (showingNearby) strings.nearbyPharmacies else strings.topPharmacies) }
                     items(top) { p -> PharmacyCard(p, strings, onClick = { onPharmacyClick(p) }) }
                 }
             }

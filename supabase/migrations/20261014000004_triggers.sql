@@ -126,6 +126,14 @@ begin
       raise exception 'Only administrators can change active status';
     end if;
 
+    -- Business structure is admin-managed; staff cannot reassign a branch to a
+    -- different business or reflag headquarters/branch code.
+    if new.business_id is distinct from old.business_id
+       or new.branch_code is distinct from old.branch_code
+       or new.is_headquarters is distinct from old.is_headquarters then
+      raise exception 'Only administrators can change business structure';
+    end if;
+
     if new.verification_status is distinct from old.verification_status
        and new.verification_status in ('verified', 'rejected', 'suspended') then
       raise exception 'Only administrators can change verification status';

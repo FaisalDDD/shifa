@@ -1,507 +1,108 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
-import { Plus, Search, RefreshCw, Package, Truck, Building2 } from "lucide-react";
-import type { Pharmacy, ProductSearchHit } from "@/types";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { StockBadge } from "@/components/inventory/stock-badge";
-import { EmptyState, LoadingState } from "@/components/ui/states";
-import { buildStockDisplay } from "@/services/inventory/stock";
-import { useLanguage, type MessageKey } from "@/lib/i18n";
+import { ArrowUpRight, Building2, Download, Globe2, HelpCircle, MapPin, MonitorDown, Phone, ShieldCheck, Unplug, UserRound } from "lucide-react";
+import type { Pharmacy } from "@/types";
+import { useLanguage, type Language } from "@/lib/i18n";
+import type { ProRelease } from "@/services/pharmacy-portal/pro-release";
+import { savePortalChange } from "./portal-request";
+import { PortalProfile } from "./portal-profile";
 
-type Tab = "overview" | "inventory" | "suppliers" | "requests";
+const card = "rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6";
+const action = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-50";
+const local = (lang: Language) => (en: string, ar: string) => lang === "ar" ? ar : en;
 
-const TABS: { key: Tab; labelKey: MessageKey; icon: typeof Package }[] = [
-  { key: "overview", labelKey: "pd.tab.overview", icon: Building2 },
-  { key: "inventory", labelKey: "pd.tab.inventory", icon: Package },
-  { key: "suppliers", labelKey: "pd.tab.suppliers", icon: Search },
-  { key: "requests", labelKey: "pd.tab.requests", icon: Truck },
-];
-
-interface InventoryRow {
-  id: string;
-  product_id: string;
-  availability_status: "AVAILABLE" | "OUT_OF_STOCK" | "UNKNOWN";
-  quantity: number | null;
-  price: number | null;
-  currency: string | null;
-  last_verified_at: string | null;
-  products: { canonical_name: string; brand_name: string | null; strength: string | null };
+interface PortalProps {
+  pharmacies: Pharmacy[];
+  ownerPharmacyIds?: string[];
+  release?: ProRelease | null;
 }
 
-interface PurchaseRow {
-  id: string;
-  buyer_pharmacy_id: string;
-  seller_pharmacy_id: string;
-  product_id: string;
-  quantity: number;
-  status: "REQUESTED" | "ACCEPTED" | "REJECTED" | "CANCELLED";
-  notes: string | null;
-  created_at: string;
-  products: { canonical_name: string; brand_name: string | null; strength: string | null } | null;
-}
-
-type Api<T> = { ok: true; data: T } | { ok: false; error: { message: string } };
-
-export function PharmacyDashboard({ pharmacies }: { pharmacies: Pharmacy[] }) {
-  const { t } = useLanguage();
-  const [tab, setTab] = useState<Tab>("overview");
-  const [activeId, setActiveId] = useState<string>(pharmacies[0]?.id ?? "");
-
-  if (pharmacies.length === 0) {
-    return (
-      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold text-slate-900">{t("pd.yourPharmacy")}</h1>
-        <p className="mt-2 text-slate-600">
-          {t("pd.noPharmacyDesc")}
-        </p>
-        <Link
-          href="/pharmacy/register"
-          className="mt-6 inline-flex h-11 items-center gap-2 rounded-lg bg-teal-600 px-5 text-sm font-medium text-white hover:bg-teal-700"
-        >
-          <Plus className="h-4 w-4" aria-hidden /> {t("pd.registerCta")}
-        </Link>
-      </div>
-    );
-  }
+export function PharmacyDashboard({ pharmacies, ownerPharmacyIds = [], release = null }: PortalProps) {
+  const { lang } = useLanguage();
+  const l = local(lang);
+  const [activeId, setActiveId] = useState(pharmacies[0]?.id ?? "");
+  const [updates, setUpdates] = useState<Record<string, Pharmacy>>({});
+  const selected = pharmacies.find((p) => p.id === activeId) ?? pharmacies[0];
+  const pharmacy = selected ? updates[selected.id] ?? selected : null;
+  const owner = pharmacy ? ownerPharmacyIds.includes(pharmacy.id) : false;
+  const onSaved = (updated: Pharmacy) => setUpdates((previous) => ({ ...previous, [updated.id]: updated }));
+  const navigation = [
+    { href: "#overview", title: l("Overview", "نظرة عامة"), icon: Building2 },
+    { href: "#profile", title: l("Pharmacy profile", "ملف الصيدلية"), icon: Globe2 },
+    ...(owner && pharmacy?.business_id ? [{ href: `/pharmacy/branches/register?business_id=${encodeURIComponent(pharmacy.business_id)}`, title: l("Register branch", "تسجيل فرع"), icon: MapPin }] : []),
+    { href: "#pro", title: "Shifa Pro", icon: MonitorDown },
+    { href: "/dashboard", title: l("My account", "حسابي"), icon: UserRound },
+    { href: "/help", title: l("Help centre", "مركز المساعدة"), icon: HelpCircle },
+  ];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-slate-900">{t("pd.title")}</h1>
-        {pharmacies.length > 1 ? (
-          <select
-            value={activeId}
-            onChange={(e) => setActiveId(e.target.value)}
-            className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm"
-            aria-label={t("pd.selectPharmacy")}
-          >
-            {pharmacies.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        ) : null}
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2 border-b border-slate-200">
-        {TABS.map((item) => (
-          <button
-            key={item.key}
-            onClick={() => setTab(item.key)}
-            className={`inline-flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium ${
-              tab === item.key
-                ? "border-teal-600 text-teal-700"
-                : "border-transparent text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <item.icon className="h-4 w-4" aria-hidden /> {t(item.labelKey)}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-6">
-        {tab === "overview" ? <Overview pharmacies={pharmacies} /> : null}
-        {tab === "inventory" && activeId ? <InventoryPanel pharmacyId={activeId} /> : null}
-        {tab === "suppliers" && activeId ? <SuppliersPanel pharmacyId={activeId} /> : null}
-        {tab === "requests" && activeId ? <RequestsPanel pharmacyId={activeId} /> : null}
-      </div>
-    </div>
-  );
-}
-
-function Overview({ pharmacies }: { pharmacies: Pharmacy[] }) {
-  const { t } = useLanguage();
-  const [availability, setAvailability] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(pharmacies.map((p) => [p.id, p.is_available !== false])),
-  );
-
-  async function toggleAvailability(p: Pharmacy) {
-    const next = !(availability[p.id] ?? true);
-    setAvailability((prev) => ({ ...prev, [p.id]: next }));
-    await fetch("/api/pharmacy/availability", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pharmacy_id: p.id, is_available: next }),
-    });
-  }
-
-  return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      {pharmacies.map((p) => {
-        const available = availability[p.id] ?? true;
-        return (
-          <div key={p.id} className="rounded-xl border border-slate-200 bg-white p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-semibold text-slate-900">{p.name}</p>
-                <p className="mt-1 text-sm text-slate-500">{p.address}</p>
-              </div>
-              <div className="flex flex-col items-end gap-1.5">
-                {p.verification_status === "verified" ? (
-                  <Badge tone="teal">{t("pd.verified")}</Badge>
-                ) : p.verification_status === "pending" ? (
-                  <Badge tone="amber">{t("pd.pending")}</Badge>
-                ) : (
-                  <Badge tone="rose">{p.verification_status}</Badge>
-                )}
-                <Badge tone={available ? "teal" : "rose"}>
-                  {available ? t("pd.available") : t("pd.notAvailable")}
-                </Badge>
-              </div>
+    <div dir={lang === "ar" ? "rtl" : "ltr"} lang={lang} className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
+      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 lg:grid lg:grid-cols-[230px_minmax(0,1fr)]">
+        <aside className="flex flex-col bg-[#10243b] p-6 text-white lg:p-7">
+          <Link href="/pharmacy" className="flex items-center gap-3 text-xl font-bold tracking-tight"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-400 text-[#10243b]"><Building2 size={22} aria-hidden /></span> Shifa <span className="text-xs font-medium text-sky-200">WEB</span></Link>
+          <p className="mt-6 text-xs font-semibold uppercase tracking-widest text-sky-200">{l("Pharmacy portal", "بوابة الصيدلية")}</p>
+          <nav aria-label={l("Portal navigation", "التنقل في البوابة")} className="mt-3 flex flex-wrap gap-1 lg:flex-col">
+            {navigation.filter((item) => pharmacy || item.href !== "#profile").map((item) => <Link key={item.href} href={item.href} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-200 transition hover:bg-white/10 hover:text-white"><item.icon size={18} aria-hidden />{item.title}</Link>)}
+          </nav>
+          <div className="mt-8 hidden rounded-xl border border-white/10 bg-white/5 p-4 lg:mt-auto lg:block"><p className="text-sm font-semibold text-sky-100">{l("A lighter way to stay visible.", "حضور أوضح بخطوات أبسط.")}</p><p className="mt-2 text-xs leading-5 text-slate-300">{l("Your public presence lives here. Day-to-day pharmacy work belongs in Pro.", "أدر حضور صيدليتك هنا، واستخدم Pro للعمل اليومي.")}</p></div>
+        </aside>
+        <main className="min-w-0 p-4 sm:p-7 lg:p-8">
+          <header id="overview" className="scroll-mt-24 border-b border-slate-200 pb-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div><p className="text-xs font-bold uppercase tracking-widest text-sky-700">SHIFA / {l("WORKSPACE", "مساحة العمل")}</p><h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{l("Your pharmacy, at a glance.", "صيدليتك في لمحة.")}</h1><p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">{l("Keep your listing clear, help people find you, and get started with Shifa Pro.", "حدّث معلومات صيدليتك وساعد الناس في العثور عليك وابدأ مع Shifa Pro.")}</p></div>
+              {pharmacy && <div className="w-full sm:w-60"><label htmlFor="portal-branch" className="mb-1.5 block text-xs font-semibold text-slate-500">{l("Branch / public listing", "الفرع / الصفحة العامة")}</label><select id="portal-branch" value={pharmacy.id} onChange={(event) => setActiveId(event.target.value)} className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:outline-sky-500">{pharmacies.map((p) => <option value={p.id} key={p.id}>{p.branch_name || p.name}{p.branch_code ? ` · ${p.branch_code}` : ""}</option>)}</select></div>}
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link
-                href={`/pharmacies/${p.slug}`}
-                className="inline-flex h-9 items-center rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                {t("pd.viewPublic")}
-              </Link>
-              <button
-                onClick={() => toggleAvailability(p)}
-                className="inline-flex h-9 items-center rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                {available ? t("pd.setUnavailable") : t("pd.setAvailable")}
-              </button>
+          </header>
+          {!pharmacy ? <section className={`${card} mt-6 text-center`}><Building2 className="mx-auto text-sky-600" size={36} aria-hidden /><h2 className="mt-4 text-xl font-bold text-slate-900">{l("Your first listing starts here", "ابدأ بصفحة صيدليتك الأولى")}</h2><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-600">{l("Register a pharmacy to create a public listing. Our team will review it before verification.", "سجّل صيدليتك لإنشاء صفحة عامة. سيراجع فريقنا المعلومات قبل التوثيق.")}</p><Link href="/pharmacy/register" className={`${action} mt-5 bg-sky-600 text-white hover:bg-sky-700`}>{l("Register a pharmacy", "تسجيل صيدلية")}</Link></section> : <>
+            {!owner && <p className="mt-5 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{l("Read-only access. Only a listing owner can change its profile or availability.", "صلاحية عرض فقط. يمكن لمالك الصيدلية وحده تعديل الملف أو حالة التوفر.")}</p>}
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <VerificationCard pharmacy={pharmacy} lang={lang} />
+              <section className={card}><div className="flex items-center gap-3"><span className="rounded-xl bg-slate-100 p-2.5 text-slate-500"><Unplug size={20} aria-hidden /></span><div><p className="text-xs font-semibold text-slate-500">{l("Pro connection", "اتصال Pro")}</p><h2 className="mt-0.5 font-bold text-slate-900">{l("Connection unknown", "حالة الاتصال غير معروفة")}</h2></div></div><p className="mt-4 text-sm leading-6 text-slate-600">{l("No verified device heartbeat is available. Installing Pro does not confirm a connection or a successful sync.", "لا تتوفر إشارة اتصال موثوقة من الجهاز. تثبيت Pro لا يؤكد الاتصال أو نجاح المزامنة.")}</p><a href="#pro" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-sky-700 hover:underline">{l("Get the desktop app", "الحصول على تطبيق الكمبيوتر")}<ArrowUpRight size={15} aria-hidden /></a></section>
             </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function InventoryPanel({ pharmacyId }: { pharmacyId: string }) {
-  const { t } = useLanguage();
-  const [rows, setRows] = useState<InventoryRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("");
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState<ProductSearchHit[]>([]);
-  const [searching, setSearching] = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch(`/api/pharmacies/${pharmacyId}/inventory`);
-    const json = (await res.json()) as Api<InventoryRow[]>;
-    setRows(json.ok ? json.data : []);
-    setLoading(false);
-  }, [pharmacyId]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount loading state
-    load();
-  }, [load]);
-
-  async function searchProducts() {
-    if (!q.trim()) return;
-    setSearching(true);
-    const res = await fetch(`/api/products/search?q=${encodeURIComponent(q)}`);
-    const json = (await res.json()) as Api<ProductSearchHit[]>;
-    setResults(json.ok ? json.data : []);
-    setSearching(false);
-  }
-
-  async function addProduct(productId: string) {
-    const res = await fetch("/api/pharmacy/inventory", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        pharmacy_id: pharmacyId,
-        product_id: productId,
-        availability_status: "AVAILABLE",
-        quantity: 10,
-        currency: null,
-      }),
-    });
-    if (res.ok) {
-      setResults([]);
-      setQ("");
-      load();
-    }
-  }
-
-  async function setStatus(rowId: string, status: "AVAILABLE" | "OUT_OF_STOCK") {
-    await fetch(`/api/pharmacy/inventory/${rowId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ product_id: "", availability_status: status }),
-    });
-    load();
-  }
-
-  const filteredRows = rows.filter(
-    (r) =>
-      filter.trim() === "" ||
-      r.products.canonical_name.toLowerCase().includes(filter.trim().toLowerCase()) ||
-      (r.products.brand_name ?? "").toLowerCase().includes(filter.trim().toLowerCase()),
-  );
-
-  return (
-    <div>
-      <div className="flex gap-2">
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder={t("pd.searchProductPlaceholder")}
-        />
-        <Button onClick={searchProducts} disabled={searching}>{t("common.search")}</Button>
-      </div>
-
-      {results.length > 0 ? (
-        <ul className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-          {results.slice(0, 8).map((hit) => (
-            <li key={hit.product.id} className="flex items-center justify-between gap-3">
-              <span className="text-sm text-slate-800">
-                {hit.product.canonical_name}
-                {hit.product.strength ? ` ${hit.product.strength}` : ""}
-              </span>
-              <Button size="sm" variant="secondary" onClick={() => addProduct(hit.product.id)}>
-                <Plus className="h-3.5 w-3.5" /> {t("common.add")}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      <div className="mt-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-900">{t("pd.yourInventory")}</h2>
-          <button onClick={load} className="inline-flex items-center gap-1 text-xs text-teal-700 hover:underline">
-            <RefreshCw className="h-3.5 w-3.5" /> {t("common.refresh")}
-          </button>
-        </div>
-        <div className="mt-2">
-          <Input
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder={t("pd.searchInventory")}
-          />
-        </div>
-
-        {loading ? (
-          <LoadingState />
-        ) : rows.length === 0 ? (
-          <EmptyState title={t("pd.noInventory.title")} description={t("pd.noInventory.desc")} />
-        ) : (
-          <ul className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-            {filteredRows.map((row) => {
-              const stock = buildStockDisplay(row.availability_status, row.last_verified_at);
-              return (
-                <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
-                  <div className="min-w-0">
-                    <p className="font-medium text-slate-800">
-                      {row.products.canonical_name}
-                      {row.products.strength ? ` ${row.products.strength}` : ""}
-                    </p>
-                    <StockBadge stock={stock} showFreshness />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setStatus(row.id, "AVAILABLE")}
-                      className="inline-flex h-9 items-center rounded-lg bg-teal-600 px-3 text-xs font-medium text-white hover:bg-teal-700"
-                    >
-                      {t("pd.inStock")}
-                    </button>
-                    <button
-                      onClick={() => setStatus(row.id, "OUT_OF_STOCK")}
-                      className="inline-flex h-9 items-center rounded-lg border border-slate-300 px-3 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                      {t("pd.outOfStock")}
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+            <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+              <PortalProfile key={pharmacy.id} pharmacy={pharmacy} owner={owner} lang={lang} onSaved={onSaved} />
+              <div className="space-y-6"><ListingCard pharmacy={pharmacy} lang={lang} /><AvailabilityCard key={pharmacy.id} pharmacy={pharmacy} owner={owner} lang={lang} onSaved={onSaved} /></div>
+            </div>
+          </>}
+          <section id="pro" className="relative mt-6 scroll-mt-24 overflow-hidden rounded-2xl bg-[#10243b] p-6 text-white sm:p-8">
+            <div className="pointer-events-none absolute -end-16 -top-20 h-64 w-64 rounded-full border-[36px] border-sky-400/10" aria-hidden />
+            <div className="relative flex flex-wrap items-start justify-between gap-6"><div className="max-w-lg"><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-300/25 bg-sky-300/10 px-3 py-1 text-xs font-semibold text-sky-200"><MonitorDown size={14} aria-hidden /> SHIFA PRO · WINDOWS</div><h2 className="text-2xl font-bold tracking-tight">{l("The desktop for your daily work.", "تطبيق الكمبيوتر لعملك اليومي.")}</h2><p className="mt-3 text-sm leading-6 text-slate-300">{l("Download Shifa Pro for pharmacy operations. This web portal stays focused on your listing, verification and account.", "حمّل Shifa Pro لإدارة عمليات الصيدلية. تركز هذه البوابة على الصفحة العامة والتوثيق والحساب.")}</p><p className="mt-3 text-xs leading-5 text-sky-200">{l("Next: install on your Windows computer, sign in, and follow the setup in Pro. Live connection reporting is not available here yet.", "التالي: ثبّت التطبيق على Windows وسجّل الدخول واتبع خطوات الإعداد في Pro. متابعة الاتصال المباشر غير متاحة هنا بعد.")}</p></div><div className="relative w-full sm:w-auto sm:min-w-52">{release ? <><a href="/api/downloads/pro" className={`${action} w-full bg-sky-400 text-slate-950 hover:bg-sky-300`}><Download size={18} aria-hidden />{l("Download for Windows", "تنزيل لـ Windows")}</a><p className="mt-3 text-xs text-slate-300" dir="ltr">v{release.version} · {(release.sizeBytes / 1024 / 1024).toFixed(1)} MB · .exe</p><p className="mt-1 text-xs text-slate-400">{l("Installer available on this server", "ملف التثبيت متاح على هذا الخادم")}</p></> : <div className="rounded-xl border border-white/15 bg-white/5 p-4"><p className="text-sm font-semibold">{l("Installer unavailable", "ملف التثبيت غير متاح")}</p><p className="mt-1 max-w-60 text-xs leading-5 text-slate-300">{l("No Windows release is available on this server. Contact support for installation help.", "لا يوجد إصدار Windows على هذا الخادم. تواصل مع الدعم للمساعدة في التثبيت.")}</p><Link href="/contact" className="mt-3 inline-block text-sm font-semibold text-sky-200 hover:underline">{l("Contact support", "التواصل مع الدعم")}</Link></div>}</div></div>
+          </section>
+          <footer className="mt-6 flex flex-wrap items-center justify-between gap-3 text-xs leading-5 text-slate-500"><p>{l("Delivery and notification settings are not available in this portal yet.", "إعدادات التوصيل والإشعارات غير متاحة في هذه البوابة بعد.")}</p><div className="flex gap-4"><Link href="/dashboard" className="hover:text-sky-700">{l("My account", "حسابي")}</Link><Link href="/contact" className="hover:text-sky-700">{l("Contact support", "التواصل مع الدعم")}</Link></div></footer>
+        </main>
       </div>
     </div>
   );
 }
 
-function SuppliersPanel({ pharmacyId }: { pharmacyId: string }) {
-  const { t } = useLanguage();
-  const [q, setQ] = useState("");
-  const [hits, setHits] = useState<ProductSearchHit[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searched, setSearched] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function search() {
-    if (!q.trim()) return;
-    setLoading(true);
-    setError(null);
-    setSearched(true);
-    const res = await fetch(`/api/pharmacy/suppliers/search?q=${encodeURIComponent(q)}`);
-    const json = (await res.json()) as Api<ProductSearchHit[]>;
-    if (json.ok) setHits(json.data);
-    else setError(json.error.message);
-    setLoading(false);
-  }
-
-  async function requestBulk(productId: string, sellerPharmacyId: string) {
-    const quantity = Number(prompt(t("pd.quantityPrompt")) ?? "0");
-    if (!quantity || quantity <= 0) return;
-    await fetch("/api/pharmacy/purchase-requests", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        buyer_pharmacy_id: pharmacyId,
-        seller_pharmacy_id: sellerPharmacyId,
-        product_id: productId,
-        quantity,
-      }),
-    });
-  }
-
-  return (
-    <div>
-      <div className="flex gap-2">
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && search()}
-          placeholder={t("pd.searchSupplierPlaceholder")}
-        />
-        <Button onClick={search} disabled={loading}>{t("common.search")}</Button>
-      </div>
-
-      <div className="mt-4">
-        {loading ? (
-          <LoadingState />
-        ) : error ? (
-          <p className="text-sm text-rose-600">{error}</p>
-        ) : !searched || q.trim() === "" ? (
-          <EmptyState title={t("pd.findSuppliers")} description={t("pd.findSuppliersDesc")} />
-        ) : hits.length === 0 ? (
-          <EmptyState title={t("pd.noSuppliers")} description={t("pd.noOtherPharmacy")} />
-        ) : (
-          <ul className="space-y-4">
-            {hits.map((hit) => (
-              <li key={hit.product.id} className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="font-semibold text-slate-900">
-                  {hit.product.canonical_name}
-                  {hit.product.strength ? ` ${hit.product.strength}` : ""}
-                </p>
-                {hit.pharmacies.length === 0 ? (
-                  <p className="mt-1 text-sm text-slate-500">{t("pd.noOtherPharmacy")}</p>
-                ) : (
-                  <ul className="mt-3 space-y-2">
-                    {hit.pharmacies.map((p) => (
-                      <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 p-3">
-                        <div>
-                          <Link href={`/pharmacies/${p.slug}`} className="font-medium text-teal-700 hover:underline">
-                            {p.name}
-                          </Link>
-                          {p.stock ? <div className="mt-0.5"><StockBadge stock={p.stock} showFreshness /></div> : null}
-                        </div>
-                        <Button size="sm" onClick={() => requestBulk(hit.product.id, p.id)}>
-                          {t("pd.requestBulk")}
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
+function VerificationCard({ pharmacy, lang }: { pharmacy: Pharmacy; lang: Language }) {
+  const l = local(lang);
+  const statuses = {
+    pending: [l("Pending review", "قيد المراجعة"), l("Your listing is awaiting review. Contact support if your details need correcting; verification cannot be completed from this portal.", "صفحتك بانتظار المراجعة. تواصل مع الدعم لتصحيح المعلومات؛ لا يمكن إتمام التوثيق من هذه البوابة.")],
+    verified: [l("Verified listing", "صفحة موثقة"), l("Your pharmacy identity has been verified. Keep contact details and opening hours current.", "تم توثيق هوية صيدليتك. احرص على تحديث معلومات التواصل وساعات العمل.")],
+    rejected: [l("Review needed", "تحتاج إلى مراجعة"), l("Your listing was not verified. Contact support to review the required information before another review.", "لم يتم توثيق صفحتك. تواصل مع الدعم لمراجعة المعلومات المطلوبة قبل إعادة المراجعة.")],
+    suspended: [l("Listing suspended", "الصفحة موقوفة"), l("Contact support to resolve your listing status. Profile edits do not restore verification.", "تواصل مع الدعم لمعالجة حالة الصفحة. تعديل الملف لا يعيد التوثيق.")],
+  };
+  const status = statuses[pharmacy.verification_status];
+  return <section className={card}><div className="flex items-center gap-3"><span className={`rounded-xl p-2.5 ${pharmacy.verification_status === "verified" ? "bg-sky-50 text-sky-700" : "bg-amber-50 text-amber-700"}`}><ShieldCheck size={20} aria-hidden /></span><div><p className="text-xs font-semibold text-slate-500">{l("Verification", "التوثيق")}</p><h2 className="mt-0.5 font-bold text-slate-900">{status[0]}</h2></div></div><p className="mt-4 text-sm leading-6 text-slate-600">{status[1]}</p><Link href="/contact" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-sky-700 hover:underline">{l("Verification support", "دعم التوثيق")}<ArrowUpRight size={15} aria-hidden /></Link></section>;
 }
 
-function RequestsPanel({ pharmacyId }: { pharmacyId: string }) {
-  const { t } = useLanguage();
-  const [incoming, setIncoming] = useState<PurchaseRow[]>([]);
-  const [outgoing, setOutgoing] = useState<PurchaseRow[]>([]);
-  const [loading, setLoading] = useState(true);
+function ListingCard({ pharmacy: p, lang }: { pharmacy: Pharmacy; lang: Language }) {
+  const l = local(lang);
+  return <section className={card} aria-labelledby="listing-heading"><p className="text-xs font-bold uppercase tracking-widest text-sky-700">{l("PUBLIC PRESENCE", "حضورك العام")}</p><h2 id="listing-heading" className="mt-2 text-lg font-bold text-slate-900">{l("Your listing preview", "معاينة صفحتك")}</h2><div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center gap-3"><span className="rounded-xl bg-sky-100 p-3 text-sky-700"><Building2 size={22} aria-hidden /></span><h3 className="font-bold text-slate-900">{p.name}</h3></div><p className="mt-4 flex items-start gap-2 text-sm leading-6 text-slate-600"><MapPin className="mt-1 shrink-0" size={15} aria-hidden />{[p.address, p.city].filter(Boolean).join(", ")}</p><p className="mt-2 flex items-center gap-2 text-sm text-slate-600"><Phone size={15} aria-hidden /><bdi>{p.phone || l("Phone not added", "لم يُضف رقم هاتف")}</bdi></p>{p.description && <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-500">{p.description}</p>}</div><p className="mt-3 text-xs leading-5 text-slate-500">{l("Preview of saved details, not a guarantee of public visibility or medicine stock.", "معاينة للمعلومات المحفوظة، وليست ضماناً للظهور العام أو لتوفر الأدوية.")}</p>{!p.is_active && <p className="mt-2 text-xs font-semibold text-amber-700">{l("This listing is inactive. Contact support.", "هذه الصفحة غير نشطة. تواصل مع الدعم.")}</p>}<Link href={`/pharmacies/${p.slug}`} className={`${action} mt-4 w-full border border-slate-300 text-slate-700 hover:bg-slate-50`}>{l("Open public listing", "فتح الصفحة العامة")}<ArrowUpRight size={16} aria-hidden /></Link></section>;
+}
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [inc, out] = await Promise.all([
-      fetch(
-        `/api/pharmacy/purchase-requests?pharmacy_id=${pharmacyId}&direction=incoming`,
-      ).then((r) => r.json()) as Promise<Api<PurchaseRow[]>>,
-      fetch(
-        `/api/pharmacy/purchase-requests?pharmacy_id=${pharmacyId}&direction=outgoing`,
-      ).then((r) => r.json()) as Promise<Api<PurchaseRow[]>>,
-    ]);
-    setIncoming(inc.ok ? inc.data : []);
-    setOutgoing(out.ok ? out.data : []);
-    setLoading(false);
-  }, [pharmacyId]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount loading state
-    load();
-  }, [load]);
-
-  async function act(id: string, action: "accept" | "reject" | "cancel") {
-    await fetch(`/api/pharmacy/purchase-requests/${id}/${action}`, { method: "POST" });
-    load();
+function AvailabilityCard({ pharmacy, owner, lang, onSaved }: { pharmacy: Pharmacy; owner: boolean; lang: Language; onSaved: (p: Pharmacy) => void }) {
+  const l = local(lang);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<"saved" | "error" | null>(null);
+  async function toggle() {
+    setBusy(true); setStatus(null);
+    try { onSaved(await savePortalChange("availability", { pharmacy_id: pharmacy.id, is_available: !pharmacy.is_available })); setStatus("saved"); }
+    catch { setStatus("error"); }
+    finally { setBusy(false); }
   }
-
-  const statusTone = (s: PurchaseRow["status"]) =>
-    s === "ACCEPTED" ? "teal" : s === "REJECTED" || s === "CANCELLED" ? "rose" : "amber";
-
-  function Row({ r, kind }: { r: PurchaseRow; kind: "incoming" | "outgoing" }) {
-    return (
-      <li className="flex flex-wrap items-center justify-between gap-3 p-4">
-        <div>
-          <p className="font-medium text-slate-800">
-            {r.products?.canonical_name ?? t("pd.product")}
-            {r.products?.strength ? ` ${r.products.strength}` : ""} × {r.quantity}
-          </p>
-          <p className="text-xs text-slate-500">
-            {kind === "incoming"
-              ? t("pd.fromBuyer", { id: r.buyer_pharmacy_id.slice(0, 8) })
-              : t("pd.toSeller", { id: r.seller_pharmacy_id.slice(0, 8) })}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge tone={statusTone(r.status) as "teal" | "amber" | "rose"}>{r.status}</Badge>
-          {kind === "incoming" && r.status === "REQUESTED" ? (
-            <>
-              <Button size="sm" onClick={() => act(r.id, "accept")}>{t("common.accept")}</Button>
-              <Button size="sm" variant="secondary" onClick={() => act(r.id, "reject")}>{t("common.reject")}</Button>
-            </>
-          ) : null}
-          {kind === "outgoing" && r.status === "REQUESTED" ? (
-            <Button size="sm" variant="secondary" onClick={() => act(r.id, "cancel")}>{t("common.cancel")}</Button>
-          ) : null}
-        </div>
-      </li>
-    );
-  }
-
-  if (loading) return <LoadingState />;
-
-  return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <section>
-        <h2 className="text-sm font-semibold text-slate-900">{t("pd.incomingTitle")}</h2>
-        {incoming.length === 0 ? (
-          <EmptyState title={t("pd.noIncoming")} />
-        ) : (
-          <ul className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-            {incoming.map((r) => <Row key={r.id} r={r} kind="incoming" />)}
-          </ul>
-        )}
-      </section>
-      <section>
-        <h2 className="text-sm font-semibold text-slate-900">{t("pd.outgoingTitle")}</h2>
-        {outgoing.length === 0 ? (
-          <EmptyState title={t("pd.noOutgoing")} />
-        ) : (
-          <ul className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-            {outgoing.map((r) => <Row key={r.id} r={r} kind="outgoing" />)}
-          </ul>
-        )}
-      </section>
-    </div>
-  );
+  return <section className={card}><div className="flex items-center justify-between gap-3"><h2 className="font-bold text-slate-900">{l("Temporary availability", "حالة التوفر المؤقتة")}</h2><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${pharmacy.is_available ? "bg-sky-50 text-sky-800" : "bg-amber-50 text-amber-800"}`}>{pharmacy.is_available ? l("Available", "متاحة") : l("Unavailable", "غير متاحة")}</span></div><p className="mt-3 text-sm leading-6 text-slate-600">{l("Pause your pharmacy’s availability when needed. This stays in effect until the owner changes it back; it does not change opening hours or medicine stock.", "أوقف توفر صيدليتك عند الحاجة. تبقى الحالة حتى يغيّرها المالك؛ لا تتغير ساعات العمل أو مخزون الأدوية.")}</p><button type="button" disabled={!owner || busy} onClick={toggle} className={`${action} mt-4 w-full border border-slate-300 text-slate-700 hover:bg-slate-50`}>{busy ? l("Saving…", "جارٍ الحفظ…") : pharmacy.is_available ? l("Set temporarily unavailable", "ضبط كغير متاحة مؤقتاً") : l("Restore availability", "استعادة التوفر")}</button>{!owner && <p className="mt-2 text-xs text-slate-500">{l("Owner access required", "تتطلب صلاحية المالك")}</p>}{status && <p role={status === "saved" ? "status" : "alert"} className={`mt-3 text-sm leading-6 ${status === "saved" ? "text-sky-800" : "text-rose-700"}`}>{status === "saved" ? l("Changes saved.", "تم حفظ التغييرات.") : l("Could not save. The displayed availability has not changed. Check your connection and owner access, then try again.", "تعذر الحفظ. لم تتغير حالة التوفر المعروضة. تحقق من الاتصال وصلاحية المالك ثم حاول مجدداً.")}</p>}</section>;
 }

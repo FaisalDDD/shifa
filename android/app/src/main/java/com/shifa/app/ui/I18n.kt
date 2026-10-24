@@ -23,6 +23,7 @@ data class Strings(
     val signIn: String,
     val signUp: String,
     val signOut: String,
+    val continueBrowsing: String,
     val signingInFailed: String,
     val checkEmail: String,
     val somethingWentWrong: String,
@@ -65,7 +66,11 @@ data class Strings(
     val yourInventory: String,
     val noInventory: String,
     val inStock: String,
+    val lowStock: String,
     val outOfStock: String,
+    val unknownAvailability: String,
+    val callPharmacy: String,
+    val offlineSnapshot: String,
     val searchBulkProduct: String,
     val supplierHint: String,
     val noSuppliers: String,
@@ -106,6 +111,15 @@ data class Strings(
     val noResults: String,
 )
 
+fun friendlyError(e: Exception, strings: Strings): String {
+    val m = e.message ?: ""
+    return if (m.contains("401", true) || m.contains("unauthorized", true)) {
+        strings.signingInFailed
+    } else {
+        strings.somethingWentWrong
+    }
+}
+
 val enStrings = Strings(
     appName = "Shifa",
     tagline = "Find your pharmacy. Know before you go.",
@@ -118,6 +132,7 @@ val enStrings = Strings(
     signIn = "Sign in",
     signUp = "Sign up",
     signOut = "Sign out",
+    continueBrowsing = "Continue browsing",
     signingInFailed = "Sign in failed. Check your credentials.",
     checkEmail = "Check your email to confirm your account, then sign in.",
     somethingWentWrong = "Something went wrong.",
@@ -160,7 +175,11 @@ val enStrings = Strings(
     yourInventory = "Your inventory",
     noInventory = "No inventory yet. Add products above.",
     inStock = "In stock",
+    lowStock = "Low stock",
     outOfStock = "Out of stock",
+    unknownAvailability = "Availability unknown",
+    callPharmacy = "Call the pharmacy",
+    offlineSnapshot = "Offline snapshot — availability may be outdated. Orders and payments require a connection.",
     searchBulkProduct = "Search a product to buy in bulk",
     supplierHint = "Search a product to see which other pharmacies carry it.",
     noSuppliers = "No suppliers found for this product.",
@@ -213,6 +232,7 @@ val arStrings = Strings(
     signIn = "تسجيل الدخول",
     signUp = "إنشاء حساب",
     signOut = "تسجيل الخروج",
+    continueBrowsing = "متابعة التصفح",
     signingInFailed = "فشل تسجيل الدخول. تحقق من بياناتك.",
     checkEmail = "تحقق من بريدك الإلكتروني لتأكيد حسابك، ثم سجّل الدخول.",
     somethingWentWrong = "حدث خطأ ما.",
@@ -255,7 +275,11 @@ val arStrings = Strings(
     yourInventory = "مخزونك",
     noInventory = "لا يوجد مخزون بعد. أضف منتجات بالأعلى.",
     inStock = "متوفر",
+    lowStock = "مخزون منخفض",
     outOfStock = "غير متوفر",
+    unknownAvailability = "التوفر غير معروف",
+    callPharmacy = "اتصل بالصيدلية",
+    offlineSnapshot = "نسخة مخزنة دون اتصال — قد تكون معلومات التوفر قديمة. تتطلب الطلبات والمدفوعات اتصالاً.",
     searchBulkProduct = "ابحث عن منتج لشرائه بالجملة",
     supplierHint = "ابحث عن منتج لمعرفة الصيدليات الأخرى التي توفره.",
     noSuppliers = "لم يتم العثور على مورّدين لهذا المنتج.",

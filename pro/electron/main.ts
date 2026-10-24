@@ -6,13 +6,15 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
-import { openDb, persist, type LocalDb } from "../src/main/db";
+import { closeDb, openDb, persist, type LocalDb } from "../src/main/db";
+import { databasePath, importLegacyDatabase, legacyImportAvailable } from "../src/main/database-scope";
 import { recordSale, receiveBatch, getStockLevels, removeStock } from "../src/main/stock";
 import {
   pullProducts,
   pullFinancialData,
   listProducts,
   setProductPrice,
+  setProductThreshold,
   pushQueue,
   getSyncStatus,
   reconcileInventory,
@@ -55,6 +57,7 @@ import {
 } from "../src/main/customers";
 import { listSales } from "../src/main/sales";
 import { applyPriceAdjustment, latestPriceAdjustment, previewPriceAdjustment, rollbackPriceAdjustment, type PriceScope } from "../src/main/price-management";
+import { resolveBranchSelection, type BranchOption } from "../src/main/branch-selection";
 import {
   addVacation,
   listVacations,
@@ -65,37 +68,113 @@ import type { AuthSession, AttendanceEvent, CartLine, CustomerCreditInvoice, Emp
 import { getSupabaseConfig, loadSupabaseConfig, saveSupabaseConfig } from "../src/main/config";
 
 let localDb: LocalDb | null = null;
+let dbOpening: Promise<LocalDb> | null = null;
 let session: AuthSession | null = null;
 let pharmacyId: string | null = null;
+let pendingAuth: {
+  access_token: string;
+  user_id: string;
+  email: string;
+  profileRole: string;
+  branches: BranchOption[];
+} | null = null;
+let authEpoch = 0;
+let signingIn = false;
+let signingOut = false;
+const cloudTasks = new Set<Promise<unknown>>();
 const STAFF_CARD_COLORS = ["#2563eb", "#0f9f83", "#a34db8", "#d97706", "#e34f6f", "#5367c8"];
 
+async function cloudOperation<T>(operation: () => Promise<T>): Promise<T> {
+  const task = operation();
+  cloudTasks.add(task);
+  try { return await task; } finally { cloudTasks.delete(task); }
+}
+
+async function releaseDatabase(): Promise<void> {
+  await Promise.allSettled([...cloudTasks]);
+  if (dbOpening) await dbOpening.catch(() => undefined);
+  if (localDb) { closeDb(localDb); localDb = null; }
+}
+
 async function db(): Promise<LocalDb> {
-  if (!localDb) {
-    localDb = await openDb(path.join(app.getPath("userData"), "shifa-pro.db"));
-    migrateLegacyFinancialHistory(localDb.db);
-    persist(localDb);
+  requirePharmacyOperator();
+  const identity = session;
+  const userData = app.getPath("userData");
+  const filePath = databasePath(userData, getSupabaseConfig().url, pharmacyId!);
+  if (localDb && localDb.filePath !== filePath) throw new Error("Sign out before changing branches.");
+  if (!localDb && !dbOpening) {
+    dbOpening = (async () => {
+      if (!fs.existsSync(filePath) && legacyImportAvailable(userData)) {
+        if (identity?.membership_role !== "owner") throw new Error("The pharmacy owner must assign the existing records to a branch first.");
+        const answer = await dialog.showMessageBox({
+          type: "warning", title: "Assign existing pharmacy records", buttons: ["Assign to this branch", "Cancel"],
+          defaultId: 1, cancelId: 1,
+          message: "An older shared pharmacy database was found.",
+          detail: `Assign those records to branch ${pharmacyId}? Only confirm if these records belong to this branch. The original database will be kept as a backup.`,
+        });
+        if (identity !== session) throw new Error("Sign in again before opening records.");
+        if (answer.response !== 0) throw new Error("Existing records were not assigned. Ask the pharmacy owner to confirm their branch.");
+        importLegacyDatabase(userData, filePath);
+      }
+      const opened = await openDb(filePath);
+      if (identity !== session) { opened.db.close(); throw new Error("Sign in again before opening records."); }
+      try { migrateLegacyFinancialHistory(opened.db); persist(opened); }
+      catch (error) { opened.db.close(); throw error; }
+      localDb = opened;
+      return opened;
+    })();
   }
-  return localDb;
+  try {
+    const opened = localDb ?? await dbOpening!;
+    if (identity !== session) throw new Error("Sign in again before accessing records.");
+    return opened;
+  } finally { dbOpening = null; }
 }
 
 function requirePharmacyOperator(): void {
-  if (!session || (session.role !== "admin" && !pharmacyId)) {
+  if (!session || !pharmacyId || signingOut) {
     throw new Error("Sign in with an account linked to this pharmacy.");
   }
 }
 
 function requirePharmacyOwner(): void {
   requirePharmacyOperator();
-  if (session?.role !== "admin" && session?.membership_role !== "owner") {
+  if (session?.membership_role !== "owner") {
     throw new Error("Only the pharmacy owner can manage staff and shifts.");
   }
 }
 
 function requireFinanceAccess(): void {
   requirePharmacyOperator();
-  if (session?.role !== "admin" && session?.membership_role !== "owner") {
+  if (session?.membership_role !== "owner") {
     throw new Error("Financial records are available to the pharmacy owner only.");
   }
+}
+
+async function activateBranch(branch: BranchOption): Promise<AuthSession> {
+  if (!pendingAuth) throw new Error("Choose a pharmacy branch after signing in.");
+  if (branch.membership_role === "staff") {
+    const access = await pharmacyTeamAction<{ employment_status: string }>(pendingAuth.access_token, {
+      action: "check_access", pharmacy_id: branch.id,
+    });
+    if (["suspended", "deactivated"].includes(access.employment_status)) {
+      throw new Error("Your pharmacy account is inactive. Contact the pharmacy administrator.");
+    }
+  }
+  const active: AuthSession = {
+    access_token: pendingAuth.access_token,
+    user_id: pendingAuth.user_id,
+    email: pendingAuth.email,
+    role: pendingAuth.profileRole === "admin" ? "admin" : "pharmacy_staff",
+    membership_role: branch.membership_role,
+    branch_id: branch.id,
+    business_id: branch.business_id,
+    branch_name: branch.branch_name || branch.name,
+  };
+  pharmacyId = branch.id;
+  session = active;
+  pendingAuth = null;
+  return active;
 }
 
 function decodeDataUrl(dataUrl: string): {
@@ -195,42 +274,93 @@ function registerIpc(): void {
     return { url, anonKey };
   });
   ipcMain.handle("settings:setBackend", (_e, input: { url: string; anonKey: string }) => {
+    if (session || pendingAuth || signingIn || signingOut || cloudTasks.size) throw new Error("Sign out before changing the server connection.");
     return saveSupabaseConfig(path.join(app.getPath("userData"), "backend.json"), input);
   });
 
   ipcMain.handle("auth:signIn", async (_e, email: string, password: string) => {
-    const s = await signIn(email, password);
-    let prof: { role: string }[];
-    let members: { pharmacy_id: string; membership_role: "owner" | "staff" }[];
+    if (signingIn || signingOut) throw new Error("A sign-in change is already in progress.");
+    signingIn = true;
+    const attempt = ++authEpoch;
+    session = null;
+    pharmacyId = null;
+    pendingAuth = null;
     try {
-      [prof, members] = await Promise.all([
-        postgrest<{ role: string }[]>(`profiles?id=eq.${s.user_id}&select=role`, { token: s.access_token }),
-        postgrest<{ pharmacy_id: string; membership_role: "owner" | "staff" }[]>(
-          `pharmacy_members?user_id=eq.${s.user_id}&select=pharmacy_id,membership_role`, { token: s.access_token }),
-      ]);
-    } catch (err) {
-      throw new Error("Your email and password were accepted, but pharmacy sign-in is not initialized. Apply the Supabase migrations and deploy the pharmacy-team function.");
-    }
-    if (!prof.length) throw new Error("Your profile is missing. Contact the pharmacy owner or Shifa support.");
-    const selectedPharmacyId = members[0]?.pharmacy_id ?? null;
-    const membershipRole = members[0]?.membership_role ?? null;
-    if (membershipRole === "staff" && selectedPharmacyId) {
-      const access = await pharmacyTeamAction<{ employment_status: string }>(s.access_token, {
-        action: "check_access", pharmacy_id: selectedPharmacyId,
-      });
-      if (["suspended", "deactivated"].includes(access.employment_status)) {
-        throw new Error("Your pharmacy account is inactive. Contact the pharmacy administrator.");
+      await releaseDatabase();
+      const s = await signIn(email, password);
+      let prof: { role: string }[];
+      let members: {
+        pharmacy_id: string;
+        membership_role: "owner" | "staff";
+        pharmacies: {
+          id: string;
+          name: string;
+          business_id: string;
+          branch_name: string | null;
+          branch_code: string | null;
+          verification_status: string;
+          is_active: boolean;
+        } | null;
+      }[];
+      try {
+        [prof, members] = await Promise.all([
+          postgrest<{ role: string }[]>(`profiles?id=eq.${s.user_id}&select=role`, { token: s.access_token }),
+          postgrest<typeof members>(
+            `pharmacy_members?user_id=eq.${s.user_id}&select=pharmacy_id,membership_role,pharmacies(id,name,business_id,branch_name,branch_code,verification_status,is_active)`,
+            { token: s.access_token },
+          ),
+        ]);
+      } catch {
+        throw new Error("Your email and password were accepted, but pharmacy sign-in is not initialized. Apply the Supabase migrations and deploy the pharmacy-team function.");
       }
-    }
-    pharmacyId = selectedPharmacyId;
-    const role = prof[0].role === "admin" ? "admin" : membershipRole ? "pharmacy_staff" : prof[0].role;
-    session = { ...s, role, membership_role: membershipRole };
-    return { session, pharmacyId };
+      if (!prof.length) throw new Error("Your profile is missing. Contact the pharmacy owner or Shifa support.");
+      const branches: BranchOption[] = members.map((member) => {
+        const pharmacy = member.pharmacies;
+        return {
+          id: pharmacy?.id ?? member.pharmacy_id,
+          business_id: pharmacy?.business_id ?? member.pharmacy_id,
+          name: pharmacy?.name ?? "Pharmacy branch",
+          branch_name: pharmacy?.branch_name ?? null,
+          branch_code: pharmacy?.branch_code ?? null,
+          membership_role: member.membership_role,
+          verification_status: pharmacy?.verification_status ?? null,
+          is_active: pharmacy?.is_active ?? true,
+        };
+      });
+      if (!branches.length) {
+        if (prof[0].role === "admin") {
+          const adminSession: AuthSession = { ...s, role: "admin", membership_role: null, branch_id: null, business_id: null };
+          session = adminSession;
+          return { session: adminSession, pharmacyId: null, branches: [] };
+        }
+        throw new Error("This account is not assigned to a pharmacy branch yet. Ask the pharmacy administrator to add you.");
+      }
+      if (attempt !== authEpoch || signingOut) throw new Error("Sign-in was cancelled. Please sign in again.");
+      pendingAuth = { ...s, profileRole: prof[0].role, branches };
+      const selection = resolveBranchSelection(branches);
+      if (selection.kind === "needs-selection") {
+        return { session: null, pharmacyId: null, branches };
+      }
+      const active = await activateBranch(selection.branch);
+      return { session: active, pharmacyId: selection.branch.id, branches };
+    } finally { signingIn = false; }
+  });
+
+  ipcMain.handle("auth:selectBranch", async (_e, branchId: string) => {
+    if (signingIn || signingOut) throw new Error("A sign-in change is already in progress.");
+    const selection = resolveBranchSelection(pendingAuth?.branches ?? [], branchId);
+    if (selection.kind !== "selected") throw new Error("Choose a pharmacy branch to continue.");
+    const active = await activateBranch(selection.branch);
+    return { session: active, pharmacyId: selection.branch.id, branches: [selection.branch] };
   });
 
   ipcMain.handle("auth:signOut", async () => {
+    ++authEpoch;
     session = null;
     pharmacyId = null;
+    pendingAuth = null;
+    signingOut = true;
+    try { await releaseDatabase(); } finally { signingOut = false; }
   });
 
   ipcMain.handle("settings:changePassword", async (_e, newPassword: string) => {
@@ -238,39 +368,41 @@ function registerIpc(): void {
     await changePassword(session.access_token, newPassword);
   });
 
-  ipcMain.handle("sync:pull", async () => {
+  ipcMain.handle("sync:pull", () => cloudOperation(async () => {
+    requirePharmacyOperator();
+    const active = session!;
+    const branch = pharmacyId!;
     const d = await db();
     const count = await pullProducts(d.db);
-    const financialCount = session && pharmacyId && (session.role === "admin" || session.membership_role === "owner")
-      ? await pullFinancialData(d.db, session.access_token, pharmacyId)
-      : 0;
+    const financialCount = active.role === "admin" || active.membership_role === "owner"
+      ? await pullFinancialData(d.db, active.access_token, branch) : 0;
     persist(d);
     return { count, financialCount };
-  });
+  }));
 
-  ipcMain.handle("sync:push", async () => {
+  ipcMain.handle("sync:push", () => cloudOperation(async () => {
+    requirePharmacyOperator();
+    const active = session!;
+    const branch = pharmacyId!;
     const d = await db();
-    if (!session || !pharmacyId) {
-      return { pushed: 0, failed: 0, reason: "no-session" };
+    const result = await pushQueue(d.db, active.access_token, branch);
+    if (result.failed === 0 && (active.role === "admin" || active.membership_role === "owner")) {
+      await pullFinancialData(d.db, active.access_token, branch);
     }
-    const result = await pushQueue(d.db, session.access_token, pharmacyId);
-    if (result.failed === 0 && (session.role === "admin" || session.membership_role === "owner")) {
-      await pullFinancialData(d.db, session.access_token, pharmacyId);
-    }
-    const reconciliation = result.failed === 0
-      ? await reconcileInventory(d.db, session.access_token, pharmacyId)
-      : null;
+    const reconciliation = result.failed === 0 ? await reconcileInventory(d.db, active.access_token, branch) : null;
     persist(d);
     return { ...result, reconciliation };
-  });
+  }));
 
-  ipcMain.handle("sync:reconcile", async () => {
-    if (!session || !pharmacyId) throw new Error("Sign in to a linked pharmacy before reconciling.");
+  ipcMain.handle("sync:reconcile", () => cloudOperation(async () => {
+    requirePharmacyOperator();
+    const active = session!;
+    const branch = pharmacyId!;
     const d = await db();
-    const result = await reconcileInventory(d.db, session.access_token, pharmacyId);
+    const result = await reconcileInventory(d.db, active.access_token, branch);
     persist(d);
     return result;
-  });
+  }));
 
   ipcMain.handle("sync:status", async () => {
     const d = await db();
@@ -283,7 +415,7 @@ function registerIpc(): void {
   });
 
   ipcMain.handle("stock:receive", async (_e, batch) => {
-    requirePharmacyOperator();
+    requireFinanceAccess();
     const d = await db();
     receiveBatch(d.db, {
       product_id: batch.product_id,
@@ -509,6 +641,14 @@ function registerIpc(): void {
     persist(d);
   });
 
+  ipcMain.handle("product:setThreshold", async (_e, productId: string, threshold: unknown) => {
+    requireFinanceAccess();
+    const d = await db();
+    const normalized = setProductThreshold(d.db, productId, threshold, session?.user_id ?? null);
+    persist(d);
+    return normalized;
+  });
+
   ipcMain.handle("insights:expiring", async () => {
     requirePharmacyOperator();
     const d = await db();
@@ -541,6 +681,9 @@ function registerIpc(): void {
 
   ipcMain.handle("purchases:attach", async (_e, purchaseId: string) => {
     requireFinanceAccess();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(purchaseId)) {
+      throw new Error("Invalid purchase record.");
+    }
     const result = await dialog.showOpenDialog({ properties: ["openFile"], filters: [
       { name: "Invoice attachment", extensions: ["pdf", "png", "jpg", "jpeg", "webp"] },
     ] });
@@ -672,6 +815,11 @@ function registerIpc(): void {
     requirePharmacyOwner();
     if (!session || !pharmacyId) throw new Error("Sign in to a pharmacy first.");
     return pharmacyTeamAction(session.access_token, { action: "invite", pharmacy_id: pharmacyId, email });
+  });
+  ipcMain.handle("team:provisionAdmin", async (_e, input: { email: string; password: string; display_name: string }) => {
+    requirePharmacyOwner();
+    if (!session || !pharmacyId) throw new Error("Sign in to a pharmacy first.");
+    return pharmacyTeamAction(session.access_token, { action: "provision_initial_admin", pharmacy_id: pharmacyId, admin_email: input.email, admin_password: input.password, display_name: input.display_name });
   });
   ipcMain.handle("team:remove", async (_e, userId: string) => {
     requirePharmacyOwner();

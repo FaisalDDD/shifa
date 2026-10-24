@@ -97,6 +97,7 @@ export function Pos({
   const [recvCost, setRecvCost] = useState("");
   const [recvSalePrice, setRecvSalePrice] = useState("");
   const [priceEdit, setPriceEdit] = useState("");
+  const [thresholdEdit, setThresholdEdit] = useState("5");
   const [recvPayStatus, setRecvPayStatus] = useState<PayStatus>("unpaid");
   const [recvPaidFrom, setRecvPaidFrom] = useState<"cash" | "bank">("cash");
   const [recvAmountPaid, setRecvAmountPaid] = useState("");
@@ -358,6 +359,25 @@ export function Pos({
     }
   }
 
+  async function saveThreshold() {
+    if (!stockProductId) return;
+    const threshold = Number(thresholdEdit);
+    if (!Number.isInteger(threshold) || threshold < 0) {
+      setNotice("Enter a whole-number low-stock threshold.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await window.api.product.setThreshold(stockProductId, threshold);
+      setNotice("Low-stock threshold saved. It will publish when this branch synchronizes.");
+      await refresh();
+    } catch (err) {
+      setNotice(friendly(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function push() {
     setBusy(true);
     setNotice(null);
@@ -575,7 +595,7 @@ export function Pos({
         </div>
 
         <div className="user">
-          <span>{session.email}</span>
+          <span>{session.branch_name ? `${session.branch_name} · ` : ""}{session.email}</span>
           <button className="link" onClick={onSignOut}>
             Sign out
           </button>
@@ -804,6 +824,7 @@ export function Pos({
                       setStockProductId(p.id);
                       setStockQuery("");
                       setPriceEdit(p.price != null ? String(p.price) : "");
+                      setThresholdEdit(String(p.low_stock_threshold ?? 5));
                     }}
                   >
                     <div>
@@ -846,6 +867,7 @@ export function Pos({
                     onClick={() => {
                       setStockProductId("");
                       setPriceEdit("");
+                      setThresholdEdit("5");
                     }}
                   >
                     ✕
@@ -863,6 +885,21 @@ export function Pos({
                     />
                     <button className="secondary" onClick={savePrice} disabled={busy}>
                       {t("stock.savePrice")}
+                    </button>
+                  </div>
+                )}
+                {isAdmin && (
+                  <div className="price-row">
+                    <input
+                      type="number"
+                      min={0}
+                      step="1"
+                      placeholder="Low-stock threshold (units)"
+                      value={thresholdEdit}
+                      onChange={(e) => setThresholdEdit(e.target.value)}
+                    />
+                    <button className="secondary" onClick={saveThreshold} disabled={busy}>
+                      Save threshold
                     </button>
                   </div>
                 )}

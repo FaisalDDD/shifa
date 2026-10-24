@@ -86,6 +86,17 @@ const { error: membersError } = await supabase.from("pharmacy_members").upsert([
   { pharmacy_id: pharmacyId, user_id: employee.id, membership_role: "staff" },
 ], { onConflict: "pharmacy_id,user_id" });
 if (membersError) throw membersError;
+const { data: branch, error: branchError } = await supabase
+  .from("pharmacies")
+  .select("business_id")
+  .eq("id", pharmacyId)
+  .single();
+if (branchError || !branch?.business_id) throw branchError ?? new Error("Demo branch business was not created.");
+const { error: businessMemberError } = await supabase.from("pharmacy_business_members").upsert(
+  { business_id: branch.business_id, user_id: owner.id, membership_role: "owner" },
+  { onConflict: "business_id,user_id" },
+);
+if (businessMemberError) throw businessMemberError;
 
 const shiftDate = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 const { error: shiftError } = await supabase.from("pharmacy_shifts").upsert({

@@ -203,7 +203,7 @@ async function enrichAvailability(
   const pharmacyIds = pharmacies.map((p) => p.id);
 
   const { data: inventory } = await supabase
-    .from("pharmacy_inventory")
+    .from("pharmacy_inventory_public")
     .select("*")
     .in("product_id", productIds)
     .in("pharmacy_id", pharmacyIds);

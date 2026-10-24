@@ -1,5 +1,6 @@
 import type {
   AuthSession,
+  AuthSignInResult,
   AttendanceEvent,
   CartLine,
   CatalogEntry,
@@ -78,10 +79,8 @@ export interface CustomerAddInput {
 
 export interface ShifaProApi {
   auth: {
-    signIn(
-      email: string,
-      password: string,
-    ): Promise<{ session: AuthSession; pharmacyId: string | null }>;
+    signIn(email: string, password: string): Promise<AuthSignInResult>;
+    selectBranch(branchId: string): Promise<AuthSignInResult>;
     signOut(): Promise<void>;
   };
   settings: {
@@ -139,6 +138,7 @@ export interface ShifaProApi {
     submit(submission: ProductSubmissionInput): Promise<{ id: string }>;
     lookupImage(name: string): Promise<string | null>;
     setPrice(productId: string, price: number): Promise<void>;
+    setThreshold(productId: string, threshold: number): Promise<number>;
   };
   insights: {
     expiring(): Promise<ExpiryItem[]>;
@@ -187,6 +187,7 @@ export interface ShifaProApi {
   team: {
     list(): Promise<PharmacyEmployee[]>;
     invite(email: string): Promise<{ invited: boolean; email: string }>;
+    provisionAdmin(input: { email: string; password: string; display_name: string }): Promise<{ provisioned: boolean; user_id: string; email: string; display_name: string }>;
     remove(userId: string): Promise<{ removed: boolean; deactivated?: boolean }>;
     saveSettings(input: {
       user_id: string;

@@ -15,3 +15,6 @@ captures/
 # Keystore (never commit signing keys)
 *.jks
 *.keystore
+
+# Sanitized build script is source; override the legacy root exclusion.
+!/app/build.gradle.kts

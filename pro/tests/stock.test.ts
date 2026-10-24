@@ -7,7 +7,7 @@ import {
   allocateFefo,
   availableForProduct,
   recordSale,
-  upsertBatch,
+  receiveBatch,
 } from "../src/main/stock";
 
 describe("allocateFefo", () => {
@@ -69,39 +69,41 @@ describe("recordSale (offline DB)", () => {
   });
 
   it("decrements FEFO and enqueues a sync op", () => {
-    upsertBatch(db.db, {
-      id: "b1",
+    const b1 = receiveBatch(db.db, {
       product_id: "p1",
       lot_no: "L1",
-      expiry_date: "2026-06-01",
+      expiry_date: "2098-06-01",
       quantity: 10,
-      cost_price: 5,
+      unit_cost: 5,
     });
-    upsertBatch(db.db, {
-      id: "b2",
+    const b2 = receiveBatch(db.db, {
       product_id: "p1",
       lot_no: "L2",
-      expiry_date: "2027-01-01",
+      expiry_date: "2099-01-01",
       quantity: 10,
-      cost_price: 6,
+      unit_cost: 6,
     });
 
+    const beforeQueue = all<{ id: number }>(db.db, `SELECT id FROM sync_queue`).map(r => r.id);
     const sale = recordSale(db.db, [
       { product_id: "p1", quantity: 12, unit_price: 8 },
     ]);
 
     expect(sale.lines).toHaveLength(2);
-    expect(sale.lines[0]).toMatchObject({ batch_id: "b1", quantity: 10 });
-    expect(sale.lines[1]).toMatchObject({ batch_id: "b2", quantity: 2 });
+    expect(sale.lines[0]).toMatchObject({ batch_id: b1, quantity: 10 });
+    expect(sale.lines[1]).toMatchObject({ batch_id: b2, quantity: 2 });
     expect(sale.total).toBe(96);
     expect(sale.flagged).toBe(false);
     expect(availableForProduct(db.db, "p1")).toBe(8);
 
-    const pending = all<{ n: number }>(
+    const pending = all<{ id: number; entity: string; payload: string }>(
       db.db,
-      `SELECT COUNT(*) AS n FROM sync_queue WHERE synced_at IS NULL`,
+      `SELECT id,entity,payload FROM sync_queue WHERE synced_at IS NULL`,
     );
-    expect(pending[0].n).toBe(1);
+    const saleEvents = pending.filter(r => !beforeQueue.includes(r.id));
+    expect(saleEvents.map(r => r.entity).sort()).toEqual(["financial_event", "sale"]);
+    expect(JSON.parse(saleEvents.find(r => r.entity === "sale")!.payload).sale_id).toBe(sale.sale_id);
+    expect(JSON.parse(saleEvents.find(r => r.entity === "financial_event")!.payload).journal.source_id).toBe(sale.sale_id);
   });
 
   it("persists across close/reopen", async () => {
@@ -111,21 +113,17 @@ describe("recordSale (offline DB)", () => {
     closeDb(reopened);
   });
 
-  it("flags the sale instead of throwing when stock is insufficient", () => {
-    const sale = recordSale(db.db, [
+  it("rolls back all sale effects on shortage, including an earlier allocated cart line", () => {
+    const snapshot = () => Object.fromEntries([
+      "batches", "sales", "sale_items", "inventory_movements", "financial_cost_layers",
+      "financial_journals", "financial_journal_lines", "sync_queue", "customer_ledger",
+    ].map(table => [table, all(db.db, `SELECT * FROM ${table}`)]));
+    const before = snapshot();
+    expect(() => recordSale(db.db, [
+      { product_id: "p1", quantity: 1, unit_price: 1 },
       { product_id: "p1", quantity: 999, unit_price: 1 },
-    ]);
-
-    expect(sale.flagged).toBe(true);
-    expect(sale.shortages).toHaveLength(1);
-    expect(sale.shortages[0].short_by).toBe(991);
-    // Available stock drained to zero (not negative) and the sale recorded.
-    expect(availableForProduct(db.db, "p1")).toBe(0);
-
-    const sales = all<{ n: number }>(
-      db.db,
-      `SELECT COUNT(*) AS n FROM sales`,
-    );
-    expect(sales[0].n).toBe(2);
+    ])).toThrow(/not enough saleable stock/);
+    expect(availableForProduct(db.db, "p1")).toBe(8);
+    expect(snapshot()).toEqual(before);
   });
 });

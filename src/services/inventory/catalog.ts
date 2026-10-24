@@ -24,6 +24,7 @@ export function pickBestStock(
 
   const rank = {
     AVAILABLE: 3,
+    LOW_STOCK: 2,
     UNKNOWN: 1,
     OUT_OF_STOCK: 0,
   } as const;
@@ -36,19 +37,36 @@ export function pickBestStock(
   })[0];
 }
 
+export interface PublicInventoryRow {
+  id: string;
+  pharmacy_id: string;
+  product_id: string;
+  availability_status: AvailabilityStatus;
+  price: number | null;
+  currency: string | null;
+  last_updated_at: string;
+  last_verified_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+}
+
+/** Customer-safe inventory rows never include operational quantities. */
 export async function getInventoryForPharmacy(pharmacyId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("pharmacy_inventory")
-    .select(
-      "*, products:products(*)",
-    )
+    .from("pharmacy_inventory_public")
+    .select("*")
     .eq("pharmacy_id", pharmacyId)
     .order("last_updated_at", { ascending: false });
   if (error) throw error;
-  return data as unknown as Array<
-    PharmacyInventory & { products: { id: string; canonical_name: string; brand_name: string | null; strength: string | null; dosage_form: string | null } }
-  >;
+  const rows = (data ?? []) as PublicInventoryRow[];
+  const productIds = rows.map((row) => row.product_id);
+  const { data: products, error: productsError } = productIds.length
+    ? await supabase.from("products").select("id,canonical_name,brand_name,strength,dosage_form").in("id", productIds)
+    : { data: [], error: null };
+  if (productsError) throw productsError;
+  const byProduct = new Map((products ?? []).map((product) => [product.id, product]));
+  return rows.map((row) => ({ ...row, products: byProduct.get(row.product_id) ?? { id: row.product_id, canonical_name: "", brand_name: null, strength: null, dosage_form: null } }));
 }
 
 /** Product detail page: nearby pharmacies and their stock for one product. */
@@ -83,14 +101,19 @@ export async function getProductAvailability(
 
   const pharmacyIds = pharmacies.map((p) => p.id);
   const { data: inventory, error: invError } = await supabase
-    .from("pharmacy_inventory")
+    .from("pharmacy_inventory_public")
     .select("*")
     .eq("product_id", productId)
     .in("pharmacy_id", pharmacyIds);
   if (invError) throw invError;
 
   const byPharmacy = new Map(
-    ((inventory ?? []) as PharmacyInventory[]).map((r) => [r.pharmacy_id, r]),
+    ((inventory ?? []) as PublicInventoryRow[]).map((row) => [row.pharmacy_id, {
+      ...row,
+      quantity: null,
+      source: "PHARMACY_MANUAL" as const,
+      updated_by: null,
+    } as PharmacyInventory]),
   );
 
   return pharmacies.map((p) => {

@@ -1,34 +1,23 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
-import { requirePharmacyMember } from "@/lib/auth/session";
-import { ok, handleError, errorResponse } from "@/lib/api";
+import { ok, handleError } from "@/lib/api";
+import { requirePortalOwner } from "@/services/pharmacy-portal/ownership";
+import { portalAvailabilitySchema } from "@/services/pharmacy-portal/validation";
+import { recordAudit } from "@/services/audit";
 
 export const dynamic = "force-dynamic";
 
-/** Toggle a pharmacy's "available" status (pharmacy staff or admin only). */
+/** Retained endpoint; listing availability requires explicit owner membership. */
 export async function POST(request: Request) {
   try {
-    const body = await request.json().catch(() => null);
-    if (
-      !body ||
-      typeof body.pharmacy_id !== "string" ||
-      typeof body.is_available !== "boolean"
-    ) {
-      return errorResponse(400, "bad_request", "Invalid request body.");
-    }
-
-    // Authorizes the caller against this pharmacy (throws 401/404).
-    await requirePharmacyMember(body.pharmacy_id);
-
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("pharmacies")
-      .update({ is_available: body.is_available })
-      .eq("id", body.pharmacy_id)
-      .select("*")
-      .single();
+    const input = portalAvailabilitySchema.parse(await request.json().catch(() => null));
+    const { user, client } = await requirePortalOwner(input.pharmacy_id);
+    const { data, error } = await client.from("pharmacies")
+      .update({ is_available: input.is_available })
+      .eq("id", input.pharmacy_id).select("*").single();
     if (error) throw error;
-
+    await recordAudit({ actorUserId: user.id, action: "pharmacy.portal.availability.update",
+      entityType: "pharmacy", entityId: input.pharmacy_id,
+      metadata: { is_available: input.is_available } });
     return ok(data);
   } catch (err) {
     return handleError(err);

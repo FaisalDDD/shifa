@@ -2,6 +2,9 @@ package com.shifa.app.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.google.gson.Gson
 import com.shifa.app.BuildConfig
 import okhttp3.Interceptor
@@ -15,7 +18,7 @@ import java.util.concurrent.TimeUnit
 
 /** In-memory session state (mirrors SessionStore's persisted copy). */
 object Session {
-    var accessToken: String? = null
+    var accessToken: String? by mutableStateOf(null)
     var refreshToken: String? = null
     var userId: String? = null
     var email: String? = null
@@ -60,7 +63,14 @@ object SessionStore {
     }
 
     fun clear() {
-        prefs?.edit()?.clear()?.apply()
+        // Language and other preferences share this file; remove only auth data.
+        prefs?.edit()
+            ?.remove("access_token")
+            ?.remove("refresh_token")
+            ?.remove("user_id")
+            ?.remove("email")
+            ?.remove("account_type")
+            ?.apply()
     }
 }
 
@@ -75,7 +85,7 @@ object Client {
     }
 
     // On a 401, try one token refresh (GoTrue refresh_token grant) and retry the
-    // request once. On failure, drop the session so the UI returns to sign in.
+    // request once. On failure, drop the session; public discovery stays accessible.
     private val refreshInterceptor = Interceptor { chain ->
         val request = chain.request()
         val response = chain.proceed(request)
@@ -102,10 +112,10 @@ object Client {
     private fun tryRefresh(): Boolean {
         return try {
             val body = gson.toJson(
-                mapOf("grant_type" to "refresh_token", "refresh_token" to Session.refreshToken),
+                mapOf("refresh_token" to Session.refreshToken),
             ).toRequestBody("application/json".toMediaType())
             val req = Request.Builder()
-                .url(BuildConfig.SUPABASE_URL.trimEnd('/') + "/auth/v1/token")
+                .url(BuildConfig.SUPABASE_URL.trimEnd('/') + "/auth/v1/token?grant_type=refresh_token")
                 .post(body)
                 .header("apikey", BuildConfig.SUPABASE_ANON_KEY)
                 .build()

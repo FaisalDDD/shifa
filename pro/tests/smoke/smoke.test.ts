@@ -8,9 +8,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { closeDb, openDb, type LocalDb } from "../../src/main/db";
 import { listProducts, pullProducts, getSyncStatus } from "../../src/main/sync";
-import { recordSale, upsertBatch } from "../../src/main/stock";
+import { recordSale, receiveBatch } from "../../src/main/stock";
 
-describe("smoke: live Supabase + offline engine", () => {
+// Explicit opt-in is required even if configuration points at a remote backend.
+describe.skipIf(process.env.SHIFA_LIVE_SMOKE !== "1")("smoke: live Supabase + offline engine", () => {
   it("pulls the real catalog, records an offline sale, persists", async () => {
     const dir = mkdtempSync(path.join(tmpdir(), "shifa-smoke-"));
     const db: LocalDb = await openDb(path.join(dir, "smoke.db"));
@@ -23,13 +24,12 @@ describe("smoke: live Supabase + offline engine", () => {
       expect(catalog.length).toBeGreaterThan(0);
 
       const first = catalog[0];
-      upsertBatch(db.db, {
-        id: "smoke-batch",
+      receiveBatch(db.db, {
         product_id: first.id,
         lot_no: "SMOKE",
-        expiry_date: "2027-12-31",
+        expiry_date: "2099-12-31",
         quantity: 5,
-        cost_price: 3,
+        unit_cost: 3,
       });
 
       const sale = recordSale(db.db, [
@@ -39,7 +39,8 @@ describe("smoke: live Supabase + offline engine", () => {
 
       const status = await getSyncStatus(db.db, true);
       expect(status.product_count).toBeGreaterThan(0);
-      expect(status.pending_ops).toBe(1);
+      // Receipt and sale each enqueue a financial journal and inventory event.
+      expect(status.pending_ops).toBe(4);
       expect(status.last_pull_at).not.toBeNull();
     } finally {
       closeDb(db);

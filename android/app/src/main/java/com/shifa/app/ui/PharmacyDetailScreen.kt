@@ -91,12 +91,16 @@ fun PharmacyDetailScreen(pharmacy: Pharmacy, onBack: () -> Unit) {
             Text(strings.location, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             Card(Modifier.fillMaxWidth()) {
-                AsyncImage(
-                    model = staticMapUrl(),
-                    contentDescription = strings.location,
-                    modifier = Modifier.fillMaxWidth().height(220.dp),
-                    contentScale = ContentScale.Crop,
-                )
+                if (BuildConfig.MAPS_API_KEY.isNotBlank()) {
+                    AsyncImage(
+                        model = staticMapUrl(),
+                        contentDescription = strings.location,
+                        modifier = Modifier.fillMaxWidth().height(220.dp),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Text(strings.mapUnavailable, modifier = Modifier.padding(16.dp))
+                }
             }
             TextButton(onClick = { openInMaps() }) {
                 Text(strings.openInMaps)

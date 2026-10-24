@@ -120,6 +120,38 @@ Deno.serve(async (request) => {
     })) });
   }
 
+  if (action === "provision_initial_admin") {
+    const email = typeof body.admin_email === "string" ? body.admin_email.trim().toLowerCase() : "";
+    const password = typeof body.admin_password === "string" ? body.admin_password : "";
+    const displayName = typeof body.display_name === "string" ? body.display_name.trim().slice(0, 100) : "ADMIN";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return reply(400, { error: "Enter a valid administrator email." });
+    if (password.length < 8 || password.length > 128) return reply(400, { error: "Administrator password must be 8 to 128 characters." });
+    const { data: branch, error: branchError } = await admin.from("pharmacies").select("business_id").eq("id", pharmacyId).maybeSingle();
+    if (branchError || !branch?.business_id) return reply(500, { error: "Could not identify the pharmacy business." });
+    const { data: existingAdmin, error: existingError } = await admin.from("pharmacy_business_members")
+      .select("user_id").eq("business_id", branch.business_id).eq("membership_role", "admin").limit(1);
+    if (existingError) return reply(500, { error: "Could not check administrator setup." });
+    if (existingAdmin?.length) return reply(409, { error: "This pharmacy business already has an administrator account." });
+    const { data: createdAdmin, error: createError } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { display_name: displayName, account_type: "pharmacy_admin", business_id: branch.business_id } });
+    if (createError || !createdAdmin.user) return reply(400, { error: createError?.message ?? "Could not create the administrator account." });
+    const adminUserId = createdAdmin.user.id;
+    const { error: profileError } = await admin.from("profiles").update({ display_name: displayName, email, role: "pharmacy_staff" }).eq("id", adminUserId);
+    if (profileError) return reply(500, { error: "Administrator account was created, but its profile could not be initialized." });
+    const { error: businessMemberError } = await admin.from("pharmacy_business_members").insert({ business_id: branch.business_id, user_id: adminUserId, membership_role: "admin" });
+    if (businessMemberError) return reply(500, { error: "Administrator account was created, but business access could not be initialized." });
+    const { data: branches, error: branchesError } = await admin.from("pharmacies").select("id").eq("business_id", branch.business_id);
+    if (branchesError) return reply(500, { error: "Administrator account was created, but branch access could not be initialized." });
+    if ((branches ?? []).length) {
+      const { error: branchMembershipError } = await admin.from("pharmacy_members").upsert(
+        (branches ?? []).map((item) => ({ pharmacy_id: item.id, user_id: adminUserId, membership_role: "owner" })),
+        { onConflict: "pharmacy_id,user_id" },
+      );
+      if (branchMembershipError) return reply(500, { error: "Administrator account was created, but branch access could not be initialized." });
+    }
+    await audit({ action: "administrator.provisioned", entity_type: "business_admin", entity_id: adminUserId, metadata: { business_id: branch.business_id, email } });
+    return reply(200, { provisioned: true, user_id: adminUserId, email, display_name: displayName });
+  }
+
   if (action === "invite") {
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return reply(400, { error: "Enter a valid employee email." });
@@ -655,7 +687,7 @@ Deno.serve(async (request) => {
     const end = dateOffset(start, 32).slice(0, 7) + "-01";
     let query = admin.from("pharmacy_attendance_events")
       .select("id,employee_user_id,event_type,occurred_at,source,created_at,profiles!pharmacy_attendance_events_employee_user_id_fkey(display_name,email)")
-      .eq("pharmacy_id", pharmacyId).gte("occurred_at", `${start}T00:00:00.000Z`).lt("occurred_at", `${end}T00:00:00.000Z")
+      .eq("pharmacy_id", pharmacyId).gte("occurred_at", `${start}T00:00:00.000Z`).lt("occurred_at", `${end}T00:00:00.000Z`)
       .order("occurred_at", { ascending: false }).limit(1000);
     if (!isOwner) query = query.eq("employee_user_id", user.id);
     const { data, error } = await query;
@@ -713,8 +745,19 @@ Deno.serve(async (request) => {
       status, reviewed_by: user.id, reviewed_at: new Date().toISOString(), review_reason: reason || null,
     }).eq("pharmacy_id", pharmacyId).eq("id", correctionId).eq("status", "pending");
     if (error) return reply(400, { error: "Could not update the correction request." });
-    await notify({ recipient_user_id: correction.employee_user_id, event_type: `attendance.correction_${status}`, title: status === "approved" ? "Time correction approved" : "Time correction declined", body: status === "approved" ? "Your attendance correction was approved and added as a separate event." : `Your attendance correction was declined: ${reason}`, entity_type: "time_correction", entity_id: correction.id });
-    await audit({ action: `attendance.correction_${status}`, entity_type: "time_correction", entity_id: correction.id, metadata: { reason: reason || null } });
+    const correctionEvent = "attendance.correction_" + String(status);
+    const correctionBody = status === "approved"
+      ? "Your attendance correction was approved and added as a separate event."
+      : "Your attendance correction was declined: " + reason;
+    await notify({
+      recipient_user_id: correction.employee_user_id,
+      event_type: correctionEvent,
+      title: status === "approved" ? "Time correction approved" : "Time correction declined",
+      body: correctionBody,
+      entity_type: "time_correction",
+      entity_id: correction.id,
+    });
+    await audit({ action: correctionEvent, entity_type: "time_correction", entity_id: correction.id, metadata: { reason: reason || null } });
     return reply(200, { reviewed: true });
   }
 

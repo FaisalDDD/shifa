@@ -8,7 +8,10 @@ export interface PricePreviewRow { product_id: string; name: string; old_price: 
 function scopedProducts(db: Database, scope: PriceScope) {
   if (!["all", "otc", "prescription", "unknown"].includes(scope)) throw new Error("Choose a valid product group.");
   return all<{ id: string; canonical_name: string; price: number | null }>(db,
-    `SELECT id,canonical_name,price FROM products ${scope === "all" ? "" : "WHERE prescription_classification=?"} ORDER BY canonical_name`,
+    `SELECT p.id,p.canonical_name,COALESCE(p.price,
+      (SELECT b.sale_price FROM batches b WHERE b.product_id=p.id AND b.sale_price IS NOT NULL
+       ORDER BY b.rowid DESC LIMIT 1)) AS price
+     FROM products p ${scope === "all" ? "" : "WHERE p.prescription_classification=?"} ORDER BY p.canonical_name`,
     scope === "all" ? [] : [scope]);
 }
 
@@ -44,7 +47,10 @@ export function applyPriceAdjustment(db: Database, scope: PriceScope, percent: n
   try {
     run(db, `INSERT INTO price_adjustment_batches(id,reason,status,created_at,created_by) VALUES(?,?,'applied',?,?)`, [id, explanation, now, actorId]);
     for (const row of rows) {
-      run(db, `INSERT INTO price_adjustment_items(batch_id,product_id,old_price,new_price) VALUES(?,?,?,?)`, [id, row.product_id, row.old_price, row.new_price]);
+      // Preview uses effective price; rollback must restore the nullable override,
+      // not freeze the batch fallback as an explicit product price.
+      const original = get<{ price: number | null }>(db, `SELECT price FROM products WHERE id=?`, [row.product_id])!;
+      run(db, `INSERT INTO price_adjustment_items(batch_id,product_id,old_price,new_price) VALUES(?,?,?,?)`, [id, row.product_id, original.price, row.new_price]);
       run(db, `UPDATE products SET price=? WHERE id=?`, [row.new_price, row.product_id]);
     }
     run(db, `INSERT INTO financial_audit_events(id,event_type,entity_type,entity_id,details,created_at,created_by)

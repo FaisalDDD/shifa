@@ -26,7 +26,11 @@ export interface MapPharmacy {
 
 function stockColor(stock: StockDisplay | null): string {
   if (!stock || !stock.hasUsableData) return "#94a3b8";
-  return stock.availability === "AVAILABLE" ? "#0d4f9e" : "#e11d48";
+  return stock.availability === "AVAILABLE"
+    ? "#0d4f9e"
+    : stock.availability === "LOW_STOCK"
+      ? "#d97706"
+      : "#e11d48";
 }
 
 function dotIcon(color: string): { url: string; half: number } {

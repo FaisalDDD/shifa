@@ -36,7 +36,11 @@ export function recordPurchase(
     throw new Error("Enter a valid supplier invoice due date.");
   }
   const id = randomUUID();
-  const totalMinor = toMinorUnits(input.quantity * input.unit_cost);
+  // New receipts use cents per unit, matching FIFO layers. Never revalue history.
+  const unitCostMinor = toMinorUnits(input.unit_cost);
+  const unitCost = fromMinorUnits(unitCostMinor);
+  const totalMinor = input.quantity * unitCostMinor;
+  if (!Number.isSafeInteger(totalMinor)) throw new Error("Enter a valid amount.");
   const totalCost = fromMinorUnits(totalMinor);
   const createdAt = new Date().toISOString();
   const status = input.payment_status ?? "unpaid";
@@ -56,7 +60,7 @@ export function recordPurchase(
       input.product_id,
       input.supplier ?? null,
       input.quantity,
-      input.unit_cost,
+      unitCost,
       totalCost,
       status,
       amountPaid,
@@ -92,7 +96,7 @@ export function recordPurchase(
     product_id: input.product_id,
     supplier: input.supplier ?? null,
     quantity: input.quantity,
-    unit_cost: input.unit_cost,
+    unit_cost: unitCost,
     total_cost: totalCost,
     payment_status: status,
     amount_paid: amountPaid,

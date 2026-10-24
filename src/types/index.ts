@@ -32,7 +32,7 @@ export type FreshnessState = "recent" | "older" | "stale" | "unknown";
 
 export interface StockDisplay {
   /** Raw availability as stored. */
-  availability: "AVAILABLE" | "OUT_OF_STOCK" | "UNKNOWN";
+  availability: "AVAILABLE" | "LOW_STOCK" | "OUT_OF_STOCK" | "UNKNOWN";
   /** How fresh the report is. */
   freshness: FreshnessState;
   /** Human label, e.g. "Recently confirmed available". */
@@ -47,8 +47,8 @@ export interface StockDisplay {
   hintTimestamp?: string | null;
   /** "availability may have changed — call to confirm" when true. */
   callToConfirm: boolean;
-  /** Machine key for the icon: available | unknown | out | stale */
-  icon: "available" | "unknown" | "out";
+  /** Machine key for the icon: available | low | unknown | out | stale */
+  icon: "available" | "low" | "unknown" | "out";
   /** True when we have a usable (non-UNKNOWN) status for this product here. */
   hasUsableData: boolean;
 }

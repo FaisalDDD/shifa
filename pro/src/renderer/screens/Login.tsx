@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import type { AuthSession, PharmacyEmployee } from "../../shared/types";
+import type { AuthSession, BranchOption, PharmacyEmployee } from "../../shared/types";
 import { makeT, type Lang } from "../i18n";
 
 function friendly(err: unknown): string {
@@ -18,6 +18,13 @@ function friendly(err: unknown): string {
   return m;
 }
 
+function generatedAdminPassword(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
+  const values = new Uint32Array(18);
+  crypto.getRandomValues(values);
+  return Array.from(values, (value) => alphabet[value % alphabet.length]).join("");
+}
+
 export function Login({
   onSignedIn,
   lang,
@@ -34,7 +41,8 @@ export function Login({
   const [backendUrl, setBackendUrl] = useState("");
   const [anonKey, setAnonKey] = useState("");
   const [connectionSaved, setConnectionSaved] = useState(false);
-  const [stage, setStage] = useState<"credentials" | "profiles">("credentials");
+  const [stage, setStage] = useState<"credentials" | "branches" | "admin-setup" | "profiles">("credentials");
+  const [branches, setBranches] = useState<BranchOption[]>([]);
   const [ownerSession, setOwnerSession] = useState<AuthSession | null>(null);
   const [teamLoadError, setTeamLoadError] = useState<string | null>(null);
   const [ownerPassword, setOwnerPassword] = useState("");
@@ -42,6 +50,10 @@ export function Login({
   const [members, setMembers] = useState<PharmacyEmployee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<PharmacyEmployee | null>(null);
   const [employeePassword, setEmployeePassword] = useState("");
+  const [adminName, setAdminName] = useState("ADMIN");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminSetupBusy, setAdminSetupBusy] = useState(false);
 
   useEffect(() => {
     window.api.settings.getBackend().then((config) => {
@@ -56,39 +68,90 @@ export function Login({
     return () => clearTimeout(tId);
   }, [error]);
 
+  async function continueWithSession(nextSession: AuthSession, ownerPasswordValue: string) {
+    if (nextSession.membership_role === "owner" && nextSession.branch_id) {
+      let roster: PharmacyEmployee[] = [];
+      try {
+        roster = await window.api.team.list();
+        setTeamLoadError(null);
+      } catch (teamError) {
+        const detail = friendly(teamError);
+        setTeamLoadError(
+          /\b503\b/.test(detail)
+            ? "Your account is signed in, but Shifa's pharmacy team service returned HTTP 503. You can continue as Pharmacy admin; employee profiles will appear when the team service is available."
+            : `Your account is signed in, but the employee list could not be loaded. ${detail} You can continue as Pharmacy admin.`,
+        );
+      }
+      setOwnerSession(nextSession);
+      setOwnerPassword(ownerPasswordValue);
+      setPassword("");
+      setPharmacyId(nextSession.branch_id);
+      setMembers(roster);
+      const setupKey = `shifa-admin-setup:${nextSession.business_id ?? nextSession.branch_id}`;
+      if (!localStorage.getItem(setupKey)) {
+        setAdminName(roster.find((member) => member.user_id === nextSession.user_id)?.display_name || "ADMIN");
+        setAdminEmail(nextSession.email ? nextSession.email.replace("@", "+admin@") : "");
+        setAdminPassword(generatedAdminPassword());
+        setStage("admin-setup");
+      } else {
+        setStage("profiles");
+      }
+      return;
+    }
+    setPassword("");
+    onSignedIn(nextSession);
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const res = await window.api.auth.signIn(email, password);
-      if (res.session.membership_role === "owner" && res.pharmacyId) {
-        let roster: PharmacyEmployee[] = [];
-        try {
-          roster = await window.api.team.list();
-          setTeamLoadError(null);
-        } catch (teamError) {
-          const detail = friendly(teamError);
-          setTeamLoadError(
-            /\b503\b/.test(detail)
-              ? "Your account is signed in, but Shifa's pharmacy team service returned HTTP 503. You can continue as Pharmacy admin; employee profiles will appear when the team service is available."
-              : `Your account is signed in, but the employee list could not be loaded. ${detail} You can continue as Pharmacy admin.`,
-          );
-        }
-        setOwnerSession(res.session);
-        setOwnerPassword(password);
-        setPassword("");
-        setPharmacyId(res.pharmacyId);
-        setMembers(roster);
-        setStage("profiles");
+      const passwordValue = password;
+      const res = await window.api.auth.signIn(email, passwordValue);
+      if (!res.session) {
+        setBranches(res.branches);
+        setStage("branches");
         return;
       }
-      setPassword("");
-      onSignedIn(res.session);
+      await continueWithSession(res.session, passwordValue);
     } catch (err) {
       setError(friendly(err));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function chooseBranch(branchId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const passwordValue = password;
+      const res = await window.api.auth.selectBranch(branchId);
+      if (!res.session) throw new Error("Choose a pharmacy branch to continue.");
+      await continueWithSession(res.session, passwordValue);
+    } catch (err) {
+      setError(friendly(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function completeAdminSetup() {
+    if (!ownerSession || !pharmacyId || !adminName.trim() || !adminEmail.trim() || adminPassword.length < 8) {
+      setError("Enter an administrator name, email, and strong password of at least 8 characters.");
+      return;
+    }
+    setAdminSetupBusy(true);
+    setError(null);
+    try {
+      await window.api.team.provisionAdmin({ email: adminEmail.trim(), password: adminPassword, display_name: adminName.trim() });
+      localStorage.setItem(`shifa-admin-setup:${ownerSession.business_id ?? pharmacyId}`, "1");
+      setStage("profiles");
+    } catch (err) {
+      setError(friendly(err));
+    } finally {
+      setAdminSetupBusy(false);
     }
   }
 
@@ -140,6 +203,7 @@ export function Login({
     setSelectedEmployee(employee);
     try {
       const res = await window.api.auth.signIn(employee.email, ownerPassword);
+      if (!res.session) throw new Error("Choose a pharmacy branch before choosing an employee.");
       validateEmployeeSession(res.session, res.pharmacyId, employee);
       setOwnerPassword("");
       setPassword("");
@@ -164,6 +228,7 @@ export function Login({
     setError(null);
     try {
       const res = await window.api.auth.signIn(selectedEmployee.email, employeePassword);
+      if (!res.session) throw new Error("Choose a pharmacy branch before choosing an employee.");
       validateEmployeeSession(res.session, res.pharmacyId, selectedEmployee);
       setOwnerPassword("");
       setPassword("");
@@ -183,6 +248,7 @@ export function Login({
       await window.api.auth.signOut();
       setStage("credentials");
       setPassword("");
+      setBranches([]);
       setOwnerSession(null);
       setTeamLoadError(null);
       setOwnerPassword("");
@@ -190,6 +256,9 @@ export function Login({
       setMembers([]);
       setSelectedEmployee(null);
       setEmployeePassword("");
+      setAdminName("ADMIN");
+      setAdminEmail("");
+      setAdminPassword("");
     } catch (err) {
       setError(friendly(err));
     } finally {
@@ -215,7 +284,7 @@ export function Login({
 
   return (
     <div className="login">
-      <form className="login-card" onSubmit={stage === "credentials" ? submit : submitEmployee}>
+      <form className="login-card" onSubmit={stage === "profiles" ? submitEmployee : stage === "admin-setup" ? (event) => { event.preventDefault(); void completeAdminSetup(); } : submit}>
         <div className="brand">
           <img className="brand-logo" src="./logo.png" alt="Shifa" />
           <div>
@@ -283,6 +352,56 @@ export function Login({
             <p className="hint">
               Uses your Shifa account. Sales work offline and sync when you're back online.
             </p>
+          </>
+        ) : stage === "admin-setup" ? (
+          <>
+            <div className="profile-picker-heading">
+              <h2>Set up the pharmacy administrator</h2>
+              <p>This one-time setup runs inside Shifa Pro. Rename the administrator if needed and keep the generated password somewhere secure.</p>
+            </div>
+            <label>
+              Administrator name
+              <input value={adminName} onChange={(event) => setAdminName(event.target.value)} autoFocus required />
+            </label>
+            <label>
+              Administrator email
+              <input type="email" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} required />
+            </label>
+            <label>
+              Administrator password
+              <input type="text" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} minLength={8} required />
+            </label>
+            <p className="hint">The password is shown only in this setup screen. It is not written to logs or displayed in chat.</p>
+            {error && <div className="error">{error}</div>}
+            <button type="submit" disabled={adminSetupBusy || adminPassword.length < 8}>
+              {adminSetupBusy ? <><span className="spinner light" /> Saving…</> : "Save administrator setup"}
+            </button>
+            <button type="button" className="text-button" onClick={() => setAdminPassword(generatedAdminPassword())} disabled={adminSetupBusy}>
+              Generate another password
+            </button>
+          </>
+        ) : stage === "branches" ? (
+          <>
+            <div className="profile-picker-heading">
+              <h2>Choose a branch</h2>
+              <p>This account has access to more than one pharmacy branch. Select the branch on this computer.</p>
+            </div>
+            <div className="profile-picker">
+              {branches.map((branch) => (
+                <button type="button" className="profile-choice" key={branch.id} onClick={() => void chooseBranch(branch.id)} disabled={busy}>
+                  <span className="profile-avatar admin-avatar">{(branch.branch_name || branch.name).trim().slice(0, 1).toUpperCase()}</span>
+                  <span className="profile-copy">
+                    <strong>{branch.branch_name || branch.name}</strong>
+                    <span>{branch.name}{branch.branch_code ? ` · ${branch.branch_code}` : ""}</span>
+                  </span>
+                  <span className="profile-arrow">›</span>
+                </button>
+              ))}
+            </div>
+            {error && <div className="error">{error}</div>}
+            <button type="button" className="text-button" onClick={() => void backToCredentials()} disabled={busy}>
+              Back to sign in
+            </button>
           </>
         ) : (
           <>

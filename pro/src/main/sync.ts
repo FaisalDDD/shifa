@@ -7,6 +7,7 @@ import { all, get, getMeta, run, setMeta } from "./db";
 import { postgrest } from "./supabase";
 import type { CatalogEntry, FinancialPeriodClose, InventoryException, Product, ReconciliationResult, SyncStatus } from "../shared/types";
 import { applySyncedFinancialEvent, pullDailyRates, pullFinancialPeriods, pullRateAudit, type FinancialEvent, type FinancialPeriodEvent } from "./financial";
+import { normalizeLowStockThreshold } from "./thresholds";
 
 const PRODUCT_SELECT =
   "id,canonical_name,brand_name,strength,dosage_form,barcode,image_url,prescription_classification";
@@ -86,7 +87,8 @@ export function listProducts(db: Database, query = ""): CatalogEntry[] {
             COALESCE(SUM(CASE WHEN b.expiry_date IS NULL OR b.expiry_date >= date('now','localtime') THEN b.quantity ELSE 0 END), 0) AS stock,
             COALESCE(p.price, (SELECT b2.sale_price FROM batches b2
               WHERE b2.product_id = p.id AND b2.sale_price IS NOT NULL
-              ORDER BY b2.rowid DESC LIMIT 1)) AS price
+              ORDER BY b2.rowid DESC LIMIT 1)) AS price,
+            COALESCE(p.low_stock_threshold, 5) AS low_stock_threshold
      FROM products p
      LEFT JOIN batches b ON b.product_id = p.id
      WHERE p.canonical_name LIKE ? OR p.brand_name LIKE ?
@@ -95,6 +97,24 @@ export function listProducts(db: Database, query = ""): CatalogEntry[] {
      LIMIT 200`,
     [like, like],
   );
+}
+
+export function setProductThreshold(
+  db: Database,
+  productId: string,
+  threshold: unknown,
+  actorId: string | null = null,
+): number {
+  const normalized = normalizeLowStockThreshold(threshold);
+  const previous = get<{ low_stock_threshold: number }>(db, "SELECT low_stock_threshold FROM products WHERE id=?", [productId]);
+  if (!previous) throw new Error("Product was not found.");
+  run(db, "UPDATE products SET low_stock_threshold=? WHERE id=?", [normalized, productId]);
+  const eventId = randomUUID();
+  run(db, "INSERT INTO sync_queue(entity,op,payload,created_at) VALUES('inventory_threshold','set',?,?)", [
+    JSON.stringify({ event_id: eventId, product_id: productId, low_stock_threshold: normalized, previous: previous.low_stock_threshold, updated_by: actorId }),
+    new Date().toISOString(),
+  ]);
+  return normalized;
 }
 
 /** Set a product's default selling price (admin). Overrides batch sale_price. */
@@ -148,7 +168,18 @@ export async function pushQueue(
 
   for (const q of pending) {
     try {
-      if (q.entity === "exchange_rate" && q.op === "set") {
+      if (q.entity === "inventory_threshold" && q.op === "set") {
+        const threshold = JSON.parse(q.payload) as { event_id: string; product_id: string; low_stock_threshold: number };
+        await postgrest("rpc/set_pharmacy_inventory_threshold", {
+          token,
+          method: "POST",
+          body: {
+            p_pharmacy_id: pharmacyId,
+            p_product_id: threshold.product_id,
+            p_threshold: normalizeLowStockThreshold(threshold.low_stock_threshold),
+          },
+        });
+      } else if (q.entity === "exchange_rate" && q.op === "set") {
         const rate = JSON.parse(q.payload) as { event_id: string; business_date: string; sdg_per_usd: number };
         await postgrest("rpc/set_pharmacy_daily_exchange_rate", { token, method: "POST", body: {
           p_pharmacy_id: pharmacyId, p_event_id: rate.event_id,

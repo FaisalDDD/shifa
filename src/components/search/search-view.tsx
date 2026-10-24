@@ -32,7 +32,7 @@ type ApiResult =
 function bestAcross(stocks: (StockDisplay | null)[]): StockDisplay | null {
   const usable = stocks.filter((s): s is StockDisplay => !!s && s.hasUsableData);
   if (usable.length === 0) return null;
-  const rank = { AVAILABLE: 3, UNKNOWN: 1, OUT_OF_STOCK: 0 } as const;
+  const rank = { AVAILABLE: 3, LOW_STOCK: 2, UNKNOWN: 1, OUT_OF_STOCK: 0 } as const;
   return usable.sort((a, b) => rank[b.availability] - rank[a.availability])[0];
 }
 

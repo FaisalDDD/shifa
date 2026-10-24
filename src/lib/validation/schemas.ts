@@ -93,10 +93,43 @@ export const pharmacyUpdateSchema = pharmacyCreateSchema
 
 export const inventoryUpsertSchema = z.object({
   product_id: z.string().uuid(),
-  availability_status: z.enum(["AVAILABLE", "OUT_OF_STOCK", "UNKNOWN"]),
+  availability_status: z.enum(["AVAILABLE", "LOW_STOCK", "OUT_OF_STOCK", "UNKNOWN"]),
+  low_stock_threshold: z.coerce.number().int().min(0).max(1000000).optional(),
   quantity: z.coerce.number().int().min(0).max(1000000).nullish(),
   price: z.coerce.number().min(0).max(10000000).nullish(),
   currency: z.string().trim().toUpperCase().length(3).nullish(),
+});
+
+export const deliveryOrderCreateSchema = z.object({
+  pharmacy_id: z.string().uuid(),
+  delivery_address: z.string().trim().min(5).max(500),
+  contact_phone: z.string().trim().min(5).max(40),
+  notes: z.string().trim().max(1000).nullish(),
+  items: z.array(z.object({
+    product_id: z.string().uuid(),
+    quantity: z.coerce.number().int().min(1).max(100),
+  })).min(1).max(50),
+});
+
+export const deliveryReceiptSchema = z.object({
+  note: z.string().trim().min(1).max(1000),
+});
+
+export const deliveryRejectSchema = z.object({
+  note: z.string().trim().max(1000).optional(),
+});
+
+export const deliveryPaymentConfirmationSchema = z.object({
+  reference: z.string().trim().min(1).max(200),
+});
+
+export const deliverySettingsSchema = z.object({
+  enabled: z.boolean(),
+  delivery_fee: z.coerce.number().min(0).max(10000000),
+  bank_name: z.string().trim().max(200).nullish(),
+  bank_account_name: z.string().trim().max(200).nullish(),
+  bank_account_number: z.string().trim().max(200).nullish(),
+  transfer_instructions: z.string().trim().max(2000).nullish(),
 });
 
 // ---- Reservations ----
@@ -182,6 +215,20 @@ export const adminPharmacyCreateSchema = pharmacyCreateSchema.extend({
 // ---- Self-serve pharmacy registration ----
 
 export const pharmacyRegisterSchema = pharmacyCreateSchema.omit({ slug: true });
+
+export const pharmacyBranchRegisterSchema = pharmacyCreateSchema
+  .omit({ slug: true })
+  .extend({
+    business_id: z.string().uuid(),
+    branch_name: z.string().trim().min(1).max(120),
+    branch_code: z.string()
+      .trim()
+      .min(2)
+      .max(32)
+      .regex(/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/, "Branch code must use letters, numbers and hyphens.")
+      .transform((value) => value.toUpperCase()),
+  });
+
 
 // ---- B2B purchase requests ----
 
