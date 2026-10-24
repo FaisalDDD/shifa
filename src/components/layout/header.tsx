@@ -6,10 +6,10 @@ import { useRouter } from "next/navigation";
 import { Menu, X, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/logo";
+import { SearchBox } from "@/components/layout/search-box";
 import { useLanguage, type Language } from "@/lib/i18n";
 
 const NAV = [
-  { href: "/search", labelKey: "nav.search" as const },
   { href: "/about", labelKey: "nav.about" as const },
   { href: "/help", labelKey: "nav.help" as const },
 ];
@@ -57,6 +57,9 @@ export function Header() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         <div className="flex items-center gap-8">
           <Logo />
+          <div className="hidden md:block">
+            <SearchBox />
+          </div>
           <nav className="hidden items-center gap-6 md:flex" aria-label="Primary">
             {NAV.map((item) => (
               <Link
