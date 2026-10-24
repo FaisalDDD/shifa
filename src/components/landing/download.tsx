@@ -163,7 +163,7 @@ function ProductCard() {
         </div>
       </div>
       <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2.5">
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+        <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-600">
           <Check className="h-3 w-3" />
           متوفر
         </span>
