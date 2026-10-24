@@ -46,6 +46,7 @@ export default async function PharmacyDetailPage({
     product_id: row.product_id,
     name: row.products.canonical_name,
     strength: row.products.strength,
+    size: row.size ?? null,
     price: row.price,
     currency: row.currency,
     stock: buildStockDisplay(row.availability_status, row.last_verified_at),

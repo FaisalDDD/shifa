@@ -44,6 +44,7 @@ export interface PublicInventoryRow {
   availability_status: AvailabilityStatus;
   price: number | null;
   currency: string | null;
+  size: string | null;
   last_updated_at: string;
   last_verified_at: string | null;
   expires_at: string | null;
@@ -132,6 +133,7 @@ export interface UpsertInventoryInput {
   quantity?: number | null;
   price?: number | null;
   currency?: string | null;
+  size?: string | null;
 }
 
 /**
@@ -165,6 +167,7 @@ export async function upsertInventory(
         quantity: input.quantity ?? null,
         price: input.price ?? null,
         currency: input.currency ?? null,
+        size: input.size ?? null,
         source: "PHARMACY_MANUAL",
         last_updated_at: now,
         last_verified_at: now,

@@ -12,6 +12,7 @@ data class PublicAvailabilityItem(
     @SerializedName("availability_status") val availabilityStatus: String? = null,
     val price: Double? = null,
     val currency: String? = null,
+    val size: String? = null,
     @SerializedName("last_verified_at") val lastVerifiedAt: String? = null,
     @SerializedName("pharmacy_id") val pharmacyId: String,
     @SerializedName("pharmacy_name") val pharmacyName: String,

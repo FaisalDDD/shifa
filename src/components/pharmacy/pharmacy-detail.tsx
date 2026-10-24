@@ -13,6 +13,7 @@ export interface PharmacyInventoryRow {
   product_id: string;
   name: string;
   strength: string | null;
+  size: string | null;
   price: number | null;
   currency: string | null;
   stock: StockDisplay;
@@ -162,6 +163,9 @@ export function PharmacyDetailContent({
                     {row.name}
                     {row.strength ? ` ${row.strength}` : ""}
                   </a>
+                  {row.size ? (
+                    <p className="text-xs text-slate-500">{row.size}</p>
+                  ) : null}
                   {row.price != null ? (
                     <p className="text-xs text-slate-500">
                       {row.price.toFixed(2)} {row.currency ?? ""}

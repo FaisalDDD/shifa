@@ -177,5 +177,6 @@ data class InventoryItem(
     val quantity: Int? = null,
     @SerializedName("availability_status") val availabilityStatus: String? = null,
     @SerializedName("expires_at") val expiresAt: String? = null,
+    val size: String? = null,
     val products: ProductAdmin? = null,
 )

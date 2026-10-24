@@ -118,6 +118,14 @@ fun ProductPharmaciesScreen(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                                if (!row.size.isNullOrBlank()) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        row.size,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
                                 Spacer(Modifier.height(8.dp))
                                 AssistChip(
                                     onClick = {},

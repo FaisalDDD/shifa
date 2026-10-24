@@ -70,7 +70,8 @@ fun StockScreen(pharmacyId: String?, onBack: () -> Unit) {
                             Text(s.products?.canonicalName ?: "Unknown product", style = MaterialTheme.typography.bodyLarge)
                             val qty = s.quantity?.toString() ?: "—"
                             Text(
-                                "Qty: $qty  ·  ${s.availabilityStatus ?: ""}",
+                                "Qty: $qty  ·  ${s.availabilityStatus ?: ""}" +
+                                    (s.size?.let { "  ·  $it" } ?: ""),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

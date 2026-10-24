@@ -23,6 +23,7 @@ export async function POST(request: Request) {
         quantity: input.quantity,
         price: input.price,
         currency: input.currency,
+        size: input.size,
       },
       profile.id,
     );

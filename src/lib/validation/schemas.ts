@@ -98,6 +98,7 @@ export const inventoryUpsertSchema = z.object({
   quantity: z.coerce.number().int().min(0).max(1000000).nullish(),
   price: z.coerce.number().min(0).max(10000000).nullish(),
   currency: z.string().trim().toUpperCase().length(3).nullish(),
+  size: z.string().trim().max(100).nullish(),
 });
 
 export const deliveryOrderCreateSchema = z.object({
