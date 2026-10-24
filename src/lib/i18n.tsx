@@ -853,15 +853,15 @@ const messages = {
 
     "offline.banner": "أنت غير متصل بالإنترنت — قد تكون بعض الميزات غير متاحة.",
 
-    "landing.hero.overline": "مُحدِّد الصيدليات في السودان",
-    "landing.hero.titleA": "اعثر على الدواء",
-    "landing.hero.titleB": "الذي تحتاجه، بالقرب منك.",
+    "landing.hero.overline": "صيدليتك في جيبك",
+    "landing.hero.titleA": "القى دواك",
+    "landing.hero.titleB": "قبل ما تتحرك",
     "landing.hero.subtitle":
-      "ابحث في الصيدليات القريبة، وتحقق من التوفر المُبلّغ، واعرف قبل أن تذهب.",
-    "landing.hero.ctaPrimary": "ابحث عن الأدوية",
+      "ابحث في الصيدليات القريبة، و اتأكد من توفر الدواء",
+    "landing.hero.ctaPrimary": "ابحث",
     "landing.hero.ctaSecondary": "شاهد كيف يعمل",
     "landing.hero.scroll": "مرّر للاستكشاف",
-    "landing.hero.badge": "مخزون مُبلّغ · موثّق · بالقرب منك",
+    "landing.hero.badge": "تحديث مباشر · موثّق · جمبك",
     "landing.marquee":
       "توفر مُبلّغ · صيدليات موثّقة · ساعات عمل · حجوزات · اتجاهات · بيانات مخزون حديثة",
     "landing.problem.eyebrow": "المشكلة",

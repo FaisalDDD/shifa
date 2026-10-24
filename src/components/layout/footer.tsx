@@ -19,14 +19,12 @@ export function Footer() {
               <p className="font-semibold text-slate-800">{t("footer.product")}</p>
               <ul className="mt-2 space-y-2 text-slate-500">
                 <li><Link className="hover:text-teal-700" href="/search">{t("nav.search")}</Link></li>
-                <li><Link className="hover:text-teal-700" href="/about">{t("nav.about")}</Link></li>
-                <li><Link className="hover:text-teal-700" href="/help">{t("nav.help")}</Link></li>
               </ul>
             </div>
             <div>
               <p className="font-semibold text-slate-800">{t("footer.forPharmacies")}</p>
               <ul className="mt-2 space-y-2 text-slate-500">
-                <li><Link className="hover:text-teal-700" href="/about#pharmacies">{t("footer.listPharmacy")}</Link></li>
+                <li><Link className="hover:text-teal-700" href="/pharmacy/register">{t("footer.listPharmacy")}</Link></li>
                 <li><Link className="hover:text-teal-700" href="/contact">{t("footer.contact")}</Link></li>
               </ul>
             </div>
