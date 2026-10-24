@@ -432,6 +432,8 @@ function registerIpc(): void {
       invoice_no: batch.invoice_no ?? null,
       due_date: batch.due_date ?? null,
       notes: batch.notes ?? null,
+      strips_per_box: batch.strips_per_box ?? null,
+      pills_per_strip: batch.pills_per_strip ?? null,
       actor_id: session?.user_id ?? null,
     });
     persist(d);

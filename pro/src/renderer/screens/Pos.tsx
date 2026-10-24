@@ -96,6 +96,8 @@ export function Pos({
   const [recvInvoiceNotes, setRecvInvoiceNotes] = useState("");
   const [recvCost, setRecvCost] = useState("");
   const [recvSalePrice, setRecvSalePrice] = useState("");
+  const [recvStripsPerBox, setRecvStripsPerBox] = useState("");
+  const [recvPillsPerStrip, setRecvPillsPerStrip] = useState("");
   const [priceEdit, setPriceEdit] = useState("");
   const [thresholdEdit, setThresholdEdit] = useState("5");
   const [recvPayStatus, setRecvPayStatus] = useState<PayStatus>("unpaid");
@@ -298,6 +300,8 @@ export function Pos({
         due_date: recvDueDate || null,
         notes: recvInvoiceNotes.trim() || null,
         unit_cost: Number(recvCost),
+        strips_per_box: recvStripsPerBox ? Number(recvStripsPerBox) : null,
+        pills_per_strip: recvPillsPerStrip ? Number(recvPillsPerStrip) : null,
         payment_status: recvPayStatus,
         amount_paid: amountPaid,
         payment_method: recvPaidFrom,
@@ -312,6 +316,8 @@ export function Pos({
       setRecvInvoiceNotes("");
       setRecvCost("");
       setRecvSalePrice("");
+      setRecvStripsPerBox("");
+      setRecvPillsPerStrip("");
       setRecvPayStatus("unpaid");
       setRecvPaidFrom("cash");
       setRecvAmountPaid("");
@@ -915,6 +921,20 @@ export function Pos({
                     placeholder={t("stock.qty")}
                     value={recvQty}
                     onChange={(e) => setRecvQty(e.target.value)}
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder={t("stock.stripsPerBox")}
+                    value={recvStripsPerBox}
+                    onChange={(e) => setRecvStripsPerBox(e.target.value)}
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder={t("stock.pillsPerStrip")}
+                    value={recvPillsPerStrip}
+                    onChange={(e) => setRecvPillsPerStrip(e.target.value)}
                   />
                   <label className="field-label">{t("stock.mfg")}</label>
                   <input

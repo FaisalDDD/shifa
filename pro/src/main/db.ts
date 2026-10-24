@@ -40,7 +40,9 @@ CREATE TABLE IF NOT EXISTS batches (
   mfg_date TEXT,
   quantity INTEGER NOT NULL DEFAULT 0,
   cost_price REAL,
-  sale_price REAL
+  sale_price REAL,
+  strips_per_box INTEGER,
+  pills_per_strip INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_batches_product_expiry
@@ -347,6 +349,8 @@ export async function openDb(filePath: string): Promise<LocalDb> {
   alter("ALTER TABLE products ADD COLUMN low_stock_threshold INTEGER NOT NULL DEFAULT 5");
   alter("ALTER TABLE batches ADD COLUMN mfg_date TEXT");
   alter("ALTER TABLE batches ADD COLUMN sale_price REAL");
+  alter("ALTER TABLE batches ADD COLUMN strips_per_box INTEGER");
+  alter("ALTER TABLE batches ADD COLUMN pills_per_strip INTEGER");
   alter("ALTER TABLE sales ADD COLUMN customer_id TEXT");
   alter("ALTER TABLE sales ADD COLUMN payment_method TEXT");
   alter("ALTER TABLE sales ADD COLUMN flagged INTEGER NOT NULL DEFAULT 0");

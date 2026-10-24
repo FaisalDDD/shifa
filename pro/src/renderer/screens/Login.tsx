@@ -11,7 +11,7 @@ function friendly(err: unknown): string {
   if (/already registered|already exists|user_already/i.test(m))
     return "An account with this email already exists.";
   if (/failed to fetch|fetch failed|networkerror|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|net::ERR/i.test(m))
-    return "Can't reach this Supabase server. Check the connection settings below and try again.";
+    return "Can't reach the Shifa server. Check your internet connection and try again.";
   if (/[{}]/.test(m) || /\bat\s+/i.test(m) || /error_code|status.?code/i.test(m))
     return "Something went wrong. Please try again.";
   if (m.length > 140) return "Something went wrong. Please try again.";
@@ -37,10 +37,6 @@ export function Login({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [showConnection, setShowConnection] = useState(false);
-  const [backendUrl, setBackendUrl] = useState("");
-  const [anonKey, setAnonKey] = useState("");
-  const [connectionSaved, setConnectionSaved] = useState(false);
   const [stage, setStage] = useState<"credentials" | "branches" | "admin-setup" | "profiles">("credentials");
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [ownerSession, setOwnerSession] = useState<AuthSession | null>(null);
@@ -54,13 +50,6 @@ export function Login({
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [adminSetupBusy, setAdminSetupBusy] = useState(false);
-
-  useEffect(() => {
-    window.api.settings.getBackend().then((config) => {
-      setBackendUrl(config.url);
-      setAnonKey(config.anonKey);
-    }).catch(() => undefined);
-  }, []);
 
   useEffect(() => {
     if (!error) return;
@@ -266,22 +255,6 @@ export function Login({
     }
   }
 
-  async function saveConnection() {
-    setError(null);
-    setConnectionSaved(false);
-    if (!anonKey.trim()) {
-      setError("Start local Supabase, then paste its public anon key here. Run `supabase status -o env` from the medfind folder and copy SUPABASE_ANON_KEY; do not use SUPABASE_SERVICE_ROLE_KEY.");
-      return;
-    }
-    try {
-      const config = await window.api.settings.setBackend({ url: backendUrl, anonKey });
-      setBackendUrl(config.url);
-      setConnectionSaved(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save the server connection.");
-    }
-  }
-
   return (
     <div className="login">
       <form className="login-card" onSubmit={stage === "profiles" ? submitEmployee : stage === "admin-setup" ? (event) => { event.preventDefault(); void completeAdminSetup(); } : submit}>
@@ -323,31 +296,6 @@ export function Login({
             <button type="submit" disabled={busy}>
               {busy ? <><span className="spinner light" /> {t("sale.processing")}</> : "Sign in"}
             </button>
-
-            <button type="button" className="text-button" onClick={() => setShowConnection((v) => !v)}>
-              {showConnection ? "Hide server connection" : "Server connection"}
-            </button>
-            {showConnection && (
-              <div className="connection-settings">
-                <p>Connect this app to the Supabase project that holds your Shifa accounts. A fresh local build uses local Supabase and will not connect to a hosted project automatically.</p>
-                <label>
-                  Supabase project URL
-                  <input type="url" value={backendUrl} onChange={(e) => setBackendUrl(e.target.value)} placeholder="http://127.0.0.1:54321" required />
-                </label>
-                <label>
-                  Public anon / publishable key
-                  <input type="password" value={anonKey} onChange={(e) => setAnonKey(e.target.value)} autoComplete="off" required />
-                </label>
-                <button type="button" className="secondary-button" onClick={() => { setBackendUrl("http://127.0.0.1:54321"); setAnonKey(""); setConnectionSaved(false); setError(null); }}>
-                  Use local Supabase
-                </button>
-                <button type="button" className="secondary-button" onClick={() => void saveConnection()} disabled={!backendUrl.trim() || !anonKey.trim()}>
-                  Save connection
-                </button>
-                {connectionSaved && <p className="connection-saved">Connection saved on this computer.</p>}
-                <p className="hint">For local testing, start Docker Desktop, run <code>supabase start</code> in the medfind folder, then copy <code>SUPABASE_ANON_KEY</code> from <code>supabase status -o env</code> into this field. Create the demo logins with <code>npm run db:seed-local-users</code>. Never enter <code>SUPABASE_SERVICE_ROLE_KEY</code> here.</p>
-              </div>
-            )}
 
             <p className="hint">
               Uses your Shifa account. Sales work offline and sync when you're back online.

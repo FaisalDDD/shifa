@@ -20,6 +20,8 @@ export interface Batch {
   expiry_date: string | null;
   quantity: number;
   cost_price: number | null;
+  strips_per_box: number | null;
+  pills_per_strip: number | null;
 }
 
 export interface CartLine {

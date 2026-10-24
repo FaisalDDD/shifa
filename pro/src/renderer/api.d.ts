@@ -55,7 +55,8 @@ export interface StockReceiveInput {
   invoice_no?: string | null;
   due_date?: string | null;
   notes?: string | null;
-  notes?: string | null;
+  strips_per_box?: number | null;
+  pills_per_strip?: number | null;
 }
 
 export interface ProductSubmissionInput {

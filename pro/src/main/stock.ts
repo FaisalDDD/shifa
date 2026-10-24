@@ -305,6 +305,7 @@ export function receiveBatch(
     actor_id?: string | null;
     payment_method?: "cash" | "bank";
     invoice_no?: string | null; due_date?: string | null; notes?: string | null;
+    strips_per_box?: number | null; pills_per_strip?: number | null;
   },
 ): string {
   if (!Number.isInteger(input.quantity) || input.quantity <= 0 || !Number.isFinite(input.unit_cost) || input.unit_cost < 0) {
@@ -319,9 +320,9 @@ export function receiveBatch(
   const date = businessDate(now);
   db.run("BEGIN");
   try {
-    run(db, `INSERT INTO batches (id, product_id, lot_no, expiry_date, mfg_date, quantity, cost_price, sale_price)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, input.product_id, input.lot_no, input.expiry_date, input.mfg_date ?? null, input.quantity, input.unit_cost, input.sale_price ?? null]);
+    run(db, `INSERT INTO batches (id, product_id, lot_no, expiry_date, mfg_date, quantity, cost_price, sale_price, strips_per_box, pills_per_strip)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, input.product_id, input.lot_no, input.expiry_date, input.mfg_date ?? null, input.quantity, input.unit_cost, input.sale_price ?? null, input.strips_per_box ?? null, input.pills_per_strip ?? null]);
     run(db, `INSERT INTO inventory_movements
       (id, event_id, movement_type, product_id, batch_id, quantity_delta, unit_cost, created_at)
       VALUES (?, ?, 'receipt', ?, ?, ?, ?, ?)`,
