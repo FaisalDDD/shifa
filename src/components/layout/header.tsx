@@ -49,15 +49,17 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <div className="flex items-center gap-8">
-          <Logo />
+      <div className="mx-auto grid h-16 max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4">
+        <div className="flex items-center justify-start">
           <div className="hidden md:block">
             <SearchBox />
           </div>
         </div>
+        <div className="flex items-center justify-center px-4">
+          <Logo />
+        </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-end gap-3">
           {langSelect}
           <div className="hidden items-center gap-3 md:flex">
             {loading ? null : user ? (

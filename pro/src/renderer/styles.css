@@ -98,6 +98,14 @@ select {
   gap: 12px;
 }
 
+/* Center the brand mark on the login screen (logo above the name). */
+.login-card .brand {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
 .brand-logo {
   width: 38px;
   height: 38px;
