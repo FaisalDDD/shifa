@@ -207,7 +207,7 @@ function PhoneMockup() {
         <div className="absolute -right-[2px] top-24 h-12 w-[3px] rounded-r-full bg-slate-700" />
         <div className="absolute -left-[2px] top-16 h-16 w-[3px] rounded-l-full bg-slate-700" />
 
-        <div className="relative h-[500px] w-[240px] overflow-hidden rounded-[2.25rem] bg-white sm:h-[560px] sm:w-[270px]">
+        <div className="relative h-[430px] w-[206px] overflow-hidden rounded-[2.25rem] bg-white sm:h-[480px] sm:w-[230px]">
           {/* punch-hole camera */}
           <div className="absolute left-1/2 top-2 z-20 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-black" />
 
@@ -308,7 +308,7 @@ function AppBar({
           alt=""
           width={64}
           height={64}
-          className="relative h-16 w-16 rounded-2xl bg-white p-1.5 object-contain shadow-lg ring-1 ring-white/40"
+          className="relative h-14 w-14 rounded-2xl bg-white p-1.5 object-contain shadow-lg ring-1 ring-white/40"
         />
         <div className="relative">
           <p className="text-2xl font-semibold tracking-tight text-white">{name}</p>
@@ -317,7 +317,7 @@ function AppBar({
             {note}
           </span>
         </div>
-        <span className="relative inline-flex h-12 items-center gap-2 rounded-full bg-white px-7 text-sm font-semibold text-teal-700 shadow-lg shadow-black/20 transition group-hover:bg-teal-50">
+        <span className="relative inline-flex h-11 items-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-teal-700 shadow-lg shadow-black/20 transition group-hover:bg-teal-50">
           <Download className="h-4 w-4" />
           {cta}
         </span>
@@ -337,13 +337,13 @@ function AppBar({
         alt=""
         width={64}
         height={64}
-        className="relative h-16 w-16 rounded-2xl object-contain shadow-sm ring-1 ring-slate-900/5"
+        className="relative h-14 w-14 rounded-2xl object-contain shadow-sm ring-1 ring-slate-900/5"
       />
       <div className="relative">
         <p className="text-2xl font-semibold tracking-tight text-slate-900">{name}</p>
         <p className="mt-2 text-sm font-medium text-slate-500">{note}</p>
       </div>
-      <span className="relative inline-flex h-12 items-center gap-2 rounded-full bg-teal-600 px-7 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition group-hover:bg-teal-700">
+      <span className="relative inline-flex h-11 items-center gap-2 rounded-full bg-teal-600 px-6 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition group-hover:bg-teal-700">
         <Download className="h-4 w-4" />
         {cta}
       </span>
