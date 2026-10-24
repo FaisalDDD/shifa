@@ -479,6 +479,9 @@ const messages = {
     "landing.download.note": "APK · Android",
     "landing.download.web": "or use the web app",
     "landing.download.ios": "iOS — coming soon",
+    "landing.download.pro.cta": "Download Shifa Pro",
+    "landing.download.pro.note": "APK · Android · pharmacy admins",
+    "landing.download.pro.desc": "Financial, employees and stock dashboards — for pharmacy admins only.",
   },
   ar: {
     "nav.search": "بحث",
@@ -904,6 +907,9 @@ const messages = {
     "landing.download.note": "APK · أندرويد",
     "landing.download.web": "أو استخدم نسخة الويب",
     "landing.download.ios": "iOS — قريباً",
+    "landing.download.pro.cta": "حمّل شفاء برو",
+    "landing.download.pro.note": "APK · أندرويد · مديرو الصيدليات",
+    "landing.download.pro.desc": "لوحات المالية والموظفين والمخزون — لمديري الصيدليات فقط.",
   },
 } as const;
 

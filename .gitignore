@@ -50,6 +50,7 @@ next-env.d.ts
 /supabase/.temp/
 /supabase/.branches/
 /android/gradle.properties
+/pro-android/gradle.properties
 # Existing build script contains a public Maps key; add after externalizing it.
 /android/app/build.gradle.kts
 *.db

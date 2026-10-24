@@ -4,6 +4,7 @@
 # 100MB file limit and are not part of the web runtime.
 /pro
 /android
+/pro-android
 /supabase
 /docs
 /scripts
