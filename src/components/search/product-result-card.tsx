@@ -41,7 +41,11 @@ export function ProductResultCard({ hit }: { hit: ProductSearchHit }) {
         ) : (
           <span className="inline-flex items-center gap-1.5 text-sm text-slate-500">
             <HelpCircle className="h-4 w-4" aria-hidden />
-            {t("product.noLocation")}
+            {hit.pharmacy_count > 0
+              ? hit.pharmacy_count === 1
+                ? t("product.pharmacyCountOne")
+                : t("product.pharmacyCount", { count: hit.pharmacy_count })
+              : t("product.pharmacyCountNone")}
           </span>
         )}
       </div>

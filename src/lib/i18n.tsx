@@ -253,6 +253,9 @@ const messages = {
     "product.nearest": "Nearest: {dist}",
     "product.pharmacyReporting": "1 pharmacy reporting",
     "product.pharmaciesReporting": "{count} pharmacies reporting",
+    "product.pharmacyCountNone": "No pharmacies have reported this product yet",
+    "product.pharmacyCountOne": "1 pharmacy has this product",
+    "product.pharmacyCount": "{count} pharmacies have this product",
 
     // --- pharmacy detail ---
     "pharmacy.notListed":
@@ -709,6 +712,9 @@ const messages = {
     "product.nearest": "الأقرب: {dist}",
     "product.pharmacyReporting": "صيدلية واحدة تُبلغ",
     "product.pharmaciesReporting": "{count} صيدليات تُبلغ",
+    "product.pharmacyCountNone": "لا توجد صيدليات أبلغت عن هذا المنتج بعد",
+    "product.pharmacyCountOne": "صيدلية واحدة لديها هذا المنتج",
+    "product.pharmacyCount": "{count} صيدليات لديها هذا المنتج",
 
     "pharmacy.notListed": "هذه الصيدلية غير مدرجة حاليًا في نتائج البحث.",
     "pharmacy.verified": "موثَّقة",

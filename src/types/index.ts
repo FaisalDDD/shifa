@@ -67,6 +67,8 @@ export interface ProductSearchHit {
   best: StockDisplay | null;
   /** Distance of the nearest carrying pharmacy (meters). */
   nearest_distance_m: number | null;
+  /** Global count of pharmacies reporting this product available (location-independent). */
+  pharmacy_count: number;
   /** Relevance score (higher = better match). */
   score: number;
 }

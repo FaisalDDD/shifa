@@ -108,6 +108,9 @@ export async function searchProducts(
     options,
   );
 
+  // Global, location-independent pharmacy counts for the "N pharmacies have this" label.
+  const counts = await getGlobalPharmacyCounts(ranked.map((r) => r.product.id));
+
   const hits: ProductSearchHit[] = ranked.map((r) => {
     const pharmacies = enriched.get(r.product.id) ?? [];
     const stockDisplays = pharmacies
@@ -125,6 +128,7 @@ export async function searchProducts(
       pharmacies,
       best,
       nearest_distance_m: nearest,
+      pharmacy_count: counts.get(r.product.id) ?? 0,
       score: r.score,
     };
   });
@@ -226,5 +230,29 @@ async function enrichAvailability(
       });
     result.set(productId, list);
   }
+  return result;
+}
+
+/** Count distinct pharmacies reporting each product as available, globally. */
+async function getGlobalPharmacyCounts(
+  productIds: string[],
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (!productIds.length) return result;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("pharmacy_inventory_public")
+    .select("product_id, pharmacy_id")
+    .in("product_id", productIds)
+    .in("availability_status", ["AVAILABLE", "LOW_STOCK"]);
+  if (error) throw error;
+
+  const sets = new Map<string, Set<string>>();
+  for (const row of (data ?? []) as { product_id: string; pharmacy_id: string }[]) {
+    if (!sets.has(row.product_id)) sets.set(row.product_id, new Set());
+    sets.get(row.product_id)!.add(row.pharmacy_id);
+  }
+  for (const [pid, s] of sets) result.set(pid, s.size);
   return result;
 }
