@@ -277,7 +277,10 @@ export function Pos({
       setNotice("Enter the unit cost.");
       return;
     }
-    const total = Number(recvQty) * Number(recvCost);
+    const strips = Number(recvStripsPerBox) || 0;
+    const pills = Number(recvPillsPerStrip) || 0;
+    const totalUnits = Math.round(Number(recvQty) * (strips || 1) * (pills || 1));
+    const total = totalUnits * Number(recvCost);
     const amountPaid =
       recvPayStatus === "paid"
         ? total
@@ -292,7 +295,7 @@ export function Pos({
         lot_no: recvLot,
         expiry_date: recvExpiry || null,
         mfg_date: recvMfg || null,
-        quantity: Number(recvQty),
+        quantity: totalUnits,
         cost_price: null,
         sale_price: recvSalePrice ? Number(recvSalePrice) : null,
         supplier: recvSupplier.trim() || null,
@@ -936,6 +939,11 @@ export function Pos({
                     value={recvPillsPerStrip}
                     onChange={(e) => setRecvPillsPerStrip(e.target.value)}
                   />
+                  {Number(recvStripsPerBox) > 0 && Number(recvPillsPerStrip) > 0 ? (
+                    <span className="field-label">
+                      = {Math.round(Number(recvQty) * Number(recvStripsPerBox) * Number(recvPillsPerStrip))} {t("stock.unitsShort")}
+                    </span>
+                  ) : null}
                   <label className="field-label">{t("stock.mfg")}</label>
                   <input
                     type="date"
