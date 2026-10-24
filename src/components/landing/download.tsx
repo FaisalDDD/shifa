@@ -141,7 +141,7 @@ function AppHeader({ pro = false, dark = false }: { pro?: boolean; dark?: boolea
         alt=""
         width={22}
         height={22}
-        className={`h-[22px] w-[22px] rounded-md object-contain ${dark ? "ring-1 ring-white/20" : "ring-1 ring-slate-900/10"}`}
+        className={`h-[22px] w-[22px] rounded-md object-contain ${dark ? "bg-white p-0.5" : "ring-1 ring-slate-900/10"}`}
       />
       <span className={`text-[13px] font-bold ${dark ? "text-teal-200" : "text-teal-600"}`}>Shifa{pro ? " Pro" : ""}</span>
       <span className={`ms-auto ${dark ? "text-slate-500" : "text-slate-300"}`}>
