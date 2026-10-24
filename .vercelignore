@@ -1,0 +1,16 @@
+# Files uploaded to Vercel should be only what the Next.js web app needs.
+# The desktop (pro/) and Android (android/) apps are separate deployables;
+# their large build artifacts (e.g. pro/release/*.exe, 100MB+) exceed Vercel's
+# 100MB file limit and are not part of the web runtime.
+/pro
+/android
+/supabase
+/docs
+/scripts
+/tests
+
+# Always excluded
+.git
+.vercel
+node_modules
+.next

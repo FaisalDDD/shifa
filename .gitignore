@@ -58,3 +58,6 @@ next-env.d.ts
 *.db-wal
 desktop.ini
 !/.env.example
+
+.vercel
+.env*
