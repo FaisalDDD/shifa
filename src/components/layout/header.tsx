@@ -51,9 +51,11 @@ export function Header() {
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto grid h-16 max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4">
         <div className="flex items-center justify-start">
-          <div className="hidden md:block">
-            <SearchBox />
-          </div>
+          {!loading && !user ? (
+            <div className="hidden md:block">
+              <SearchBox />
+            </div>
+          ) : null}
         </div>
         <div className="flex items-center justify-center px-4">
           <Logo />
