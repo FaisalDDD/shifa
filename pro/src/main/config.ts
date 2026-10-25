@@ -6,13 +6,14 @@ export interface SupabaseConfig {
 }
 
 // A Supabase anon key is designed to be public. Never put a service-role key here.
+// Defaults to the hosted production project (packaged EXEs must reach production,
+// not the local dev stack). Local dev overrides via env vars.
 let active: SupabaseConfig = {
-  // Local-first default. A fresh developer build must never silently send
-  // credentials to a hosted project. Production installs should set the
-  // connection explicitly or provide environment configuration at packaging.
-  url: process.env.SHIFA_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321",
+  url: process.env.SHIFA_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    "https://lfumkuzmkmniwstzqcct.supabase.co",
   anonKey: process.env.SHIFA_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-    process.env.SUPABASE_PUBLISHABLE_KEY ?? "",
+    process.env.SUPABASE_PUBLISHABLE_KEY ??
+    "sb_publishable_W1_hnE6z2yM5T5UsO1A_Tw_NEZBQV1g",
 };
 
 export function loadSupabaseConfig(filePath: string): void {
