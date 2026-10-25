@@ -1,6 +1,6 @@
 {
   "name": "shifa-pro",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Shifa Pro — offline-first pharmacy management (POS + stock) desktop client for the Shifa platform",
   "main": "dist-electron/electron/main.js",

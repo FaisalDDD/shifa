@@ -20,12 +20,24 @@ export function loadSupabaseConfig(filePath: string): void {
   try {
     const saved = JSON.parse(fs.readFileSync(filePath, "utf8")) as Partial<SupabaseConfig>;
     if (saved.url) {
+      // Ignore a saved local-dev URL. Packaged installs must always reach
+      // production, and a stale backend.json pointing at 127.0.0.1 would
+      // otherwise override the production default and break login.
+      let host = "";
+      try {
+        host = new URL(saved.url).hostname;
+      } catch {
+        host = "";
+      }
+      if (host === "localhost" || host === "127.0.0.1" || host === "10.0.2.2") {
+        return;
+      }
       active = saved.anonKey
         ? validateSupabaseConfig({ url: saved.url, anonKey: saved.anonKey })
         : { url: saved.url, anonKey: "" };
     }
   } catch {
-    // First run or unreadable settings: keep local-first environment/default configuration.
+    // First run or unreadable settings: keep production default.
   }
 }
 
