@@ -33,10 +33,6 @@ function LoginForm() {
     }
     if (searchParams.has("next")) {
       router.push(next.startsWith("/") ? next : "/dashboard");
-    } else if (data.user?.user_metadata?.account_type === "pharmacy") {
-      router.push("/pharmacy");
-    } else if (data.user?.user_metadata?.account_type === "pharmacy_employee") {
-      router.push("/pharmacy");
     } else {
       router.push("/dashboard");
     }

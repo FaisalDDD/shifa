@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Search, Building2 } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/lib/i18n";
 import type { Pharmacy } from "@/types";
@@ -35,18 +35,7 @@ export function DashboardContent({
         {t("dash.signedInAs", { user })}
       </p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <Link
-          href="/search"
-          className="rounded-xl border border-slate-200 bg-white p-5 transition-colors hover:border-teal-300"
-        >
-          <Search className="h-6 w-6 text-teal-600" aria-hidden />
-          <h2 className="mt-3 font-semibold text-slate-900">{t("dash.find.title")}</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            {t("dash.find.desc")}
-          </p>
-        </Link>
-
+      <div className="mt-6 grid gap-4">
         {profile.role === "pharmacy_staff" || pharmacies.length > 0 ? (
           <Link
             href="/pharmacy"
